@@ -2,9 +2,9 @@
 A Golang script that automaticaly post attendances for apprentices, based on school's access control  
   
 ## How to use  
-1. git clone ssh://git@gitlab.42nice.fr:4222/42nice/watch-dog.git  
-2. Copy/Paste config-default.yml and fill it with your credentials  
-3. go run main.go \<path_to_config\> \<path_to_log_folder\>  
+1. `git clone ssh://git@gitlab.42nice.fr:4222/42nice/watch-dog.git`  
+2. `cp config-default.yml ./config.yml` and fill it with your credentials  
+3. `go run main.go ./config.yml \<path_to_log_folder\>`  
   
 ## What will happen  
 Watch-dog will use the Access Control API to fetch every event of the current day. (Between 7:30 AM and 8:30 PM)  
