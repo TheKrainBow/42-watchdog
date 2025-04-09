@@ -1,0 +1,4 @@
+*log*
+*.yml*
+!config-default.yml
+./watchdog
