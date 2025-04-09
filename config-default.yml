@@ -17,8 +17,10 @@ AccessControl:
     apprenticeProjects: ["2561", "2562", "2563", "2564"]
 
 42Attendance:
+    autoPost: false
     tokenUrl: "https://auth.42.fr/auth/realms/staff-42/protocol/openid-connect/token"
     endpoint: "https://chronos.42.fr/api/v1"
+    testpath: "/campus/41/sources"
     uid: "YOUR_42API_APP_UID"
     secret: "YOUR_42API_APP_TOKEN"
     username: "YOUR_42STAFF_USERNAME"
