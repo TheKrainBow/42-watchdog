@@ -84,3 +84,16 @@ func Log(msg string) {
 func CloseLogs() {
 	logFile.Close()
 }
+
+func PrintUsersTimers() {
+	for _, value := range AllUsers {
+		Log(fmt.Sprintf(" %s: %s -> %s | Total : %dh%dm%ds\n",
+			value.Login42,
+			value.FirstAccess.Format("15:04:05"),
+			value.LastAccess.Format("15:04:05"),
+			int(value.Duration.Hours()),
+			int(value.Duration.Minutes())%60,
+			int(value.Duration.Seconds())%60,
+		))
+	}
+}
