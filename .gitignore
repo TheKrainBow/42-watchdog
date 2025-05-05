@@ -1,4 +1,6 @@
 *log*
 *.yml*
 !config-default.yml
-./watchdog
+!*/*/logs.go
+watchdog-client
+watchdog-server
