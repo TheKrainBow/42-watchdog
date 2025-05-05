@@ -6,7 +6,7 @@ A standalone Golang script that automatically posts daily attendances for appren
 
 ## 🧱 What It Does
 
-This tool fetches all access control events for the current day (between 07:30 and 20:30), filters them based on predefined rules, and optionally posts validated attendances to the Chronos API.
+This tool fetches all access control events for the specified day (between 07:30 and 20:30), filters them based on predefined rules, and optionally posts validated attendances to the Chronos API.
 
 Steps performed:
 
@@ -19,7 +19,7 @@ Steps performed:
    - Create and send attendances to Chronos
    - Attendance starts at the first access, ends at the last access
    - Source is set to "access-control"
-4. A log file is generated in the folder you provide, named with the current date.
+4. A log file is generated in the folder you provide, named with the specified date.
 
 ---
 
@@ -36,7 +36,7 @@ Fill in your 42 API credentials, Chronos token, and the list of alternant projec
 ### 2. Run the Script
 
 ```bash
-go run main.go ./config.yml /path/to/log/folder
+go run main.go ./config.yml /path/to/log/folder [YYYY-05-04]
 ```
 
 This will create a dated log file in the provided folder.

@@ -17,7 +17,7 @@ func GetDailyUsers(day time.Time) {
 	end := time.Date(day.Year(), day.Month(), day.Day(), 20, 30, 0, 0, time.UTC)
 	queryUrl := fmt.Sprintf("/events/?format=datatables&start_date=%s&end_date=%s&length=-1", formatTimeForURL(start), formatTimeForURL(end))
 	fmt.Printf("Fetching Control Access events\n")
-	Log("Fetching Control Access events ...\n")
+	Log(fmt.Sprintf("Fetching Control Access events for %s ...\n", day.Format("2006-01-02")))
 	resp, err := apiManager.GetClient(config.AccessControl).Get(queryUrl)
 	if err != nil {
 		Log(fmt.Sprintf("ERROR: %s", err.Error()))
@@ -41,6 +41,7 @@ func GetDailyUsers(day time.Time) {
 	// Define the layout for the datetime format
 	layout := "2006-01-02 15:04:05"
 
+	Log(fmt.Sprintf("Found %d events\n", len(res.Data)))
 	for _, event := range res.Data {
 		if event.User != nil { // Check if user is not nil
 			// Parse the datetime field
