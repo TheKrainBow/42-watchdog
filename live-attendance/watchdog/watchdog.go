@@ -182,7 +182,7 @@ func PrintUsersTimers() {
 			Log(fmt.Sprintf("[WATCHDOG] %s %8s: %s ┆ Total : %s\n",
 				box,
 				value.Login42,
-				"  No badge usage yet ",
+				"  No badge usage yet  ",
 				formatDuration(value.Duration),
 			))
 		} else {

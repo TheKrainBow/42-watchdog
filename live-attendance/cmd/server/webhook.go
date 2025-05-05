@@ -47,12 +47,11 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	watchdog.Log(fmt.Sprintf("[CLI] 🛠️  Received command: %s", cmdReq.Command))
 	responseMessage := ""
 	statusCode := http.StatusOK
-	returnedData := `Success`
 	// Process the command
 	switch cmdReq.Command {
 	case "start_listen":
 		watchdog.AllowEvents(true)
-		responseMessage = "Webhook listening started."
+		responseMessage = "Enabled listening hooks (Check server logs for more details)"
 	case "stop_listen":
 		shouldPost := false
 		if params := cmdReq.Parameters; params != nil {
@@ -66,18 +65,16 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 		watchdog.AllowEvents(false)
 		if shouldPost {
 			watchdog.PostApprenticesAttendances()
+			responseMessage = "Disabled listening hooks and posted attendances (Check server logs for more details)"
+		} else {
+			responseMessage = "Disabled listening hooks (Check server logs for more details)"
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(returnedData)
-		return
 	case "get_status":
 		watchdog.PrintUsersTimers()
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(returnedData)
-		return
+		responseMessage = "Check server logs for status detail"
 	case "notify_students":
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(returnedData)
+		statusCode = http.StatusNotImplemented
+		responseMessage = "Coming soon"
 		return
 	default:
 		responseMessage = fmt.Sprintf("Unknown command: %s", cmdReq.Command)

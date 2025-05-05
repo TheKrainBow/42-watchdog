@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -37,9 +38,20 @@ func sendCommand(command string, params map[string]interface{}) {
 	defer resp.Body.Close()
 
 	fmt.Printf("Status: %s\n", resp.Status)
-	var respBody map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&respBody)
-	fmt.Printf("Response: %+v\n", respBody)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Response: %s\n", bodyBytes)
+	// var respBody map[string]interface{}
+	// err = json.Unmarshal(bodyBytes, &respBody)
+	// if err != nil {
+	// 	return
+	// }
+	// json.NewDecoder(resp.Body).Decode(&respBody)
 }
 
 func main() {
@@ -86,6 +98,44 @@ func main() {
 		Short: "Send notify_students command",
 		Run: func(cmd *cobra.Command, args []string) {
 			sendCommand("notify_students", nil)
+		},
+	})
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "completion",
+		Short: "Generate shell completion script",
+		Long: `To load completions:
+	
+	Bash:
+	
+	  source <(watchdog-client completion bash)
+	
+	  # To load completions for each session, execute once:
+	  # Linux:
+	  watchdog-client completion bash > /etc/bash_completion.d/watchdog-client
+	  # macOS:
+	  watchdog-client completion bash > /usr/local/etc/bash_completion.d/watchdog-client
+	
+	Zsh:
+	
+	  echo "autoload -U compinit; compinit" >> ~/.zshrc
+	  watchdog-client completion zsh > "${fpath[1]}/_watchdog-client"
+	`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				fmt.Println("Shell type required: bash, zsh, fish...")
+				return
+			}
+			switch args[0] {
+			case "bash":
+				rootCmd.GenBashCompletion(os.Stdout)
+			case "zsh":
+				rootCmd.GenZshCompletion(os.Stdout)
+			case "fish":
+				rootCmd.GenFishCompletion(os.Stdout, true)
+			default:
+				fmt.Println("Unsupported shell:", args[0])
+			}
 		},
 	})
 

@@ -20,20 +20,29 @@ CLIENT_DIR := ./cmd/client
 
 help:
 	@echo "📦  Watchdog Makefile commands:"
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-36s\033[0m %s\n", $$1, $$2}'
 
-all: $(SERVER_BIN) $(CLIENT_BIN) ## Build server and client binaries localy
+all: clean $(SERVER_BIN) $(CLIENT_BIN) ## Rebuild server and client binaries localy
 
-re: clean all ## Clean and rebuild server/client binaries localy
+build: bclean $(INSTALL_PATH)/$(SERVER_BIN) $(INSTALL_PATH)/$(CLIENT_BIN) ## Rebuild server and client binaries in /usr/local/bin
 
-$(SERVER_BIN): ## Build server binary localy
+$(INSTALL_PATH)/$(SERVER_BIN): ## Build server binary directly in /usr/local/bin
+	sudo go build -o $(INSTALL_PATH)/$(SERVER_BIN) $(SERVER_DIR)
+
+$(INSTALL_PATH)/$(CLIENT_BIN): ## Build client binary directly in /usr/local/bin
+	sudo go build -o $(INSTALL_PATH)/$(CLIENT_BIN) $(CLIENT_DIR)
+
+$(SERVER_BIN): ## Build server binary in /usr/local/bin
 	go build -o $(SERVER_BIN) $(SERVER_DIR)
 
-$(CLIENT_BIN): ## Build client binary localy
+$(CLIENT_BIN): ## Build client binary in /usr/local/bin
 	go build -o $(CLIENT_BIN) $(CLIENT_DIR)
 
 clean: ## Clean local binaries
 	rm -f $(SERVER_BIN) $(CLIENT_BIN)
+
+bclean: ## Clean built binaries in /usr/local/bin
+	sudo rm -f $(INSTALL_PATH)/$(SERVER_BIN) $(INSTALL_PATH)/$(CLIENT_BIN)
 
 server-install: $(SERVER_BIN) ## Install watchdog service
 	sudo mkdir -p /etc/watchdog
@@ -110,3 +119,33 @@ cron-remove:  ## Remove all watchdog-client-related cron jobs
 	@crontab cron.tmp
 	@rm cron.tmp
 	@echo "✅ Cron jobs cleaned"
+
+client-install-cmd-completion-zsh:  ## Install zsh completion for watchdog-client
+	@echo "Installing zsh completion for watchdog-client..."
+	@mkdir -p ~/.oh-my-zsh/completions
+	@watchdog-client completion zsh > ~/.oh-my-zsh/completions/_watchdog-client
+	@if ! grep -q "autoload -U compinit" ~/.zshrc; then \
+		echo "\n# Enable zsh completion for watchdog-client" >> ~/.zshrc; \
+		echo "autoload -U compinit; compinit" >> ~/.zshrc; \
+		echo "🔧 Added 'autoload -U compinit; compinit' to ~/.zshrc"; \
+	else \
+		echo "✅ 'autoload -U compinit' already present in ~/.zshrc"; \
+	fi
+	@echo "✅ Zsh completion installed. Restart your shell or run: source ~/.zshrc"
+
+client-install-cmd-completion-bash:  ## Install bash completion for watchdog-client
+	@echo "Installing bash completion for watchdog-client..."
+	@mkdir -p /etc/bash_completion.d
+	@watchdog-client completion bash | sudo tee /etc/bash_completion.d/watchdog-client > /dev/null
+	@echo "✅ Bash completion installed. You may need to restart your shell."
+
+client-uninstall-cmd-completion-zsh:  ## Remove zsh completion for watchdog-client
+	@echo "Removing zsh completion for watchdog-client..."
+	@rm -f ~/.oh-my-zsh/completions/_watchdog-client
+	@echo "✅ Zsh completion file removed."
+	@echo "📝 If needed, remove 'autoload -U compinit; compinit' manually from ~/.zshrc"
+
+client-uninstall-cmd-completion-bash:  ## Remove bash completion for watchdog-client
+	@echo "Removing bash completion for watchdog-client..."
+	@sudo rm -f /etc/bash_completion.d/watchdog-client
+	@echo "✅ Bash completion file removed."
