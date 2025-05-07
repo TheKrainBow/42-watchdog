@@ -4,145 +4,175 @@ A Golang-based HTTP server that listens to your school's access control system a
 
 ---
 
-## 🧱 Architecture
+## 🛠️ Prerequisites
 
-This project contains **two executables**:
-
-- **watchdog-server**: The HTTP service that listens to access events and tracks apprentice activity.
-- **watchdog-client**: A CLI tool used to interact with the server (start/stop listening, get status, etc.).
+* Go 1.21+
+* systemd (Linux)
+* A 42 API token
+* A 42 Chronos API token
+* Access control webhook support (from your school)
 
 ---
 
-## 🚀 How to Use
+## 📇 Architecture Overview
 
-### 1. Go in the project
+This project contains **two executables**:
+
+* **watchdog-server**: The main HTTP service that listens to webhook events and manages users.
+* **watchdog-client**: A CLI tool used to interact with the server (start/stop tracking, notify students, get status, etc.).
+
+---
+
+## 🚀 Setup Instructions
+
+### 1. Clone the repo & enter the project directory
+
 ```bash
 cd live-attendance
 ```
-### 2. Configure
+
+### 2. Configure your credentials
 
 ```bash
 cp config-default.yml config.yml
 ```
 
-Fill config.yml with your 42 API credentials, and the list of apprenticeship project IDs for your campus.
+Edit `config.yml` with:
 
-### 3. Install the Server as a systemd Service
+* Your 42 API token
+* Your campus apprenticeship project IDs
+* Discord/Slack webhook (if applicable)
+
+### 3. Build locally (no install)
+
+```bash
+make local-build
+```
+
+This will compile the binaries to the current folder.
+
+### 4. Install the server as a systemd service
 
 ```bash
 make server-install
 ```
 
 This will:
-- Build the watchdog-server binary
-- Copy it to /usr/local/bin/
-- Install your config to /etc/watchdog/config.json
-- Create a systemd service (without starting it)
 
-### 4. Start the Service
+* Copy `watchdog-server` to `/usr/local/bin/`
+* Copy your config to `/etc/watchdog/config.yml`
+* Create a systemd unit at `/etc/systemd/system/watchdog.service`
+
+### 5. Start the service
 
 ```bash
 make server-start
 ```
 
-### 5. (Optional) Follow the Logs
+### 6. View logs
 
 ```bash
 make server-logs
 ```
 
----
-
-## 💡 What It Does
-
-The watchdog-server listens to webhook events such as door accesses.  
-For each user detected:
-
-1. If it's the first time, it queries the 42 API.
-2. It checks if the user is an **apprentice**, based on internship project subscription with ongoing status.
-3. The event is logged.
-4. When you stop the listener via watchdog-client, attendance can be posted automatically.
-
----
-## 🖥️ Commands via watchdog-client
-
-Interact with the server using the following commands:
+### 7. Install autocompletion (optional)
 
 ```bash
-./watchdog-client start
+make client-install-cmd-completion-zsh    # for zsh
+make client-install-cmd-completion-bash   # for bash
 ```
-Enables the server to listen to incoming access control events.  
-If the server is not in "start" mode, any incoming access hooks will be ignored.
+
+### 8. Set up automated cron commands
 
 ```bash
-./watchdog-client stop
+make cron-setup
 ```
-Stops listening for events.  
-You can also pass the `--post-attendance` flag:
 
-- This will iterate through all users and reset their timers.
-- If a user meets the criteria (is an apprentice), their attendance will be posted.
+This installs:
 
-```bash
-./watchdog-client status
-```
-Displays a summary of all registered users, showing their first and last access times to the school.
-  
-
-(Coming soon)
-```bash
-./watchdog-client notifiy
-```
-Sends a notification (e.g., via Discord or Slack webhook) to every apprentice who meets the criteria:  
-- Must be an apprentice  
-- Has accumulated less than 7 hours of school presence that day
-
-You can also override the server URL with:
-
-```bash
-watchdog-client --url http://localhost:8080/commands \<command\>
-```
----
-
-## 🔧 Maintenance
-
-The 42 API does **not** expose which projects are "apprenticeship" related.  
-You must **manually maintain** the list of project IDs in your config.yml.
-
-- The provided list in config-default.yml was valid at time of writing.
-- Always double-check that your campus uses those same projects.
+* `watchdog-client start` at 07:30
+* `watchdog-client notify` at 19:30
+* `watchdog-client stop --post-attendance` at 20:30
 
 ---
 
-## 🧹 Server Management
+## 🔎 Interacting with the server via CLI
 
-Makefile commands for managing the service:
+```bash
+watchdog-client start                   # Begin listening
+watchdog-client stop                    # Stop listening
+watchdog-client stop --post-attendance  # Stop & send attendance
+watchdog-client status                  # View current user access states
+watchdog-client notify                  # Notify students with low time
+```
 
-| Action               | Command                  |
-|----------------------|--------------------------|
-| Install the server   | make server-install      |
-| Start the server     | make server-start        |
-| Stop the server      | make server-stop         |
-| Restart it           | make server-restart      |
-| See its logs         | make server-logs         |
-| Check status         | make server-status       |
-| Reload systemd       | make server-reload       |
-| Uninstall the server | make server-delete       |
+All commands are sent by default to `http://localhost:8080/commands` — override with:
 
-Logs are stored in: /var/log/watchdog.log (You can configure this in the makefile)
-
----
-
-## 📦 Dependencies
-
-- Go 1.21+
-- systemd (Linux)
-- Access Control API token
-- 42 API token
-- 42 Chronos API token
+```bash
+watchdog-client --url <custom-url> <command>
+```
 
 ---
 
-## 📜 License
+## 🛠️ Makefile Targets
+
+### 📁 Local build & clean
+
+| Command            | Description                            |
+| ------------------ | -------------------------------------- |
+| `make local-build` | Build both binaries in the current dir |
+| `make local-clean` | Remove local binaries                  |
+
+### 📂 System install
+
+| Command             | Description                             |
+| ------------------- | --------------------------------------- |
+| `make system-build` | Copy built binaries to `/usr/local/bin` |
+| `make system-clean` | Remove binaries from `/usr/local/bin`   |
+
+### ⚖️ Server management
+
+| Command                 | Description                             |
+| ----------------------- | --------------------------------------- |
+| `make server-install`   | Install service and config              |
+| `make server-start`     | Start and enable the service            |
+| `make server-stop`      | Stop and disable the service            |
+| `make server-restart`   | Stop, rebuild, and restart the service  |
+| `make server-status`    | View current service status             |
+| `make server-logs`      | View live logs                          |
+| `make server-uninstall` | Remove the service & config (keep logs) |
+
+### ⏰ Cron setup
+
+| Command            | Description                            |
+| ------------------ | -------------------------------------- |
+| `make cron-setup`  | Add 3 daily client commands to crontab |
+| `make cron-remove` | Remove all cron jobs for the client    |
+
+### 🔢 Autocompletion
+
+| Command                                     | Description             |
+| ------------------------------------------- | ----------------------- |
+| `make client-install-cmd-completion-zsh`    | Install zsh completion  |
+| `make client-install-cmd-completion-bash`   | Install bash completion |
+| `make client-uninstall-cmd-completion-zsh`  | Remove zsh completion   |
+| `make client-uninstall-cmd-completion-bash` | Remove bash completion  |
+
+### 🚮 Full cleanup
+
+| Command      | Description                                                              |
+| ------------ | ------------------------------------------------------------------------ |
+| `make purge` | Prompt to delete all binaries, service, cron, autocompletion (logs stay) |
+
+Use `make help` to list all commands grouped by category.
+
+---
+
+## 🔎 Notes
+
+* `watchdog-server` logs to `/var/log/watchdog.log`
+* You can adjust logging, config paths, and more from the `Makefile`
+
+---
 
 MIT — Made at 42 Nice by [@TheKrainBow](https://github.com/TheKrainBow)
