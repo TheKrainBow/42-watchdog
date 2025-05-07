@@ -41,7 +41,7 @@ Edit `config.yml` with:
 
 * Your 42 API token
 * Your campus apprenticeship project IDs
-* Discord/Slack webhook (if applicable)
+* Discord/Slack API keys (Comming soon)
 
 ### 3. Build locally (no install)
 
@@ -101,7 +101,7 @@ This installs:
 ```bash
 watchdog-client start                   # Begin listening
 watchdog-client stop                    # Stop listening
-watchdog-client stop --post-attendance  # Stop & send attendance
+watchdog-client stop --post-attendance  # Stop & post attendances
 watchdog-client status                  # View current user access states
 watchdog-client notify                  # Notify students with low time
 ```
