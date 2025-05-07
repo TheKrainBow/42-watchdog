@@ -23,8 +23,8 @@ func Log(msg string) {
 		fmt.Printf("\n")
 	} else {
 		msg = strings.TrimRight(msg, "\n")
-		fmt.Fprintf(logFile, "[%s] %s\n", time.Now().Format("06/01/02 - 15:04:05"), msg)
-		fmt.Printf("[%s] %s\n", time.Now().Format("06/01/02 - 15:04:05"), msg)
+		fmt.Fprintf(logFile, "[%s] %s\n", time.Now().Format("06/01/02 - 15:04:05 MST"), msg)
+		fmt.Printf("[%s] %s\n", time.Now().Format("06/01/02 - 15:04:05 MST"), msg)
 	}
 }
 
