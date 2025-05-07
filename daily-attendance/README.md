@@ -36,7 +36,7 @@ Fill in your 42 API credentials, Chronos token, and the list of alternant projec
 ### 2. Run the Script
 
 ```bash
-go run main.go ./config.yml /path/to/log/folder [YYYY-05-04]
+go run main.go ./config.yml /path/to/log/folder [YYYY-MM-DD]
 ```
 
 This will create a dated log file in the provided folder.
