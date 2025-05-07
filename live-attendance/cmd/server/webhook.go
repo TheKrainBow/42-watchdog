@@ -75,7 +75,6 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	case "notify_students":
 		statusCode = http.StatusNotImplemented
 		responseMessage = "Coming soon"
-		return
 	default:
 		responseMessage = fmt.Sprintf("Unknown command: %s", cmdReq.Command)
 		statusCode = http.StatusBadRequest
