@@ -22,26 +22,30 @@ help:
 	@echo "📦  Watchdog Makefile commands:"
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-36s\033[0m %s\n", $$1, $$2}'
 
-all: clean $(SERVER_BIN) $(CLIENT_BIN) ## Rebuild server and client binaries localy
+.PHONY: local-build system-build clean bclean
 
-build: bclean $(INSTALL_PATH)/$(SERVER_BIN) $(INSTALL_PATH)/$(CLIENT_BIN) ## Rebuild server and client binaries in /usr/local/bin
+GOFILES := $(shell find . -type f -name '*.go') # Used to detect go updated file, to rebuild only if needed
 
-$(INSTALL_PATH)/$(SERVER_BIN): ## Build server binary directly in /usr/local/bin
+local-build: $(SERVER_BIN) $(CLIENT_BIN) ## Build server and client binaries locally
+
+system-build: $(INSTALL_PATH)/$(SERVER_BIN) $(INSTALL_PATH)/$(CLIENT_BIN) ## Build server and client binaries in /usr/local/bin
+
+$(INSTALL_PATH)/$(SERVER_BIN): $(GOFILES) ## Build server binary directly in /usr/local/bin
 	sudo go build -o $(INSTALL_PATH)/$(SERVER_BIN) $(SERVER_DIR)
 
-$(INSTALL_PATH)/$(CLIENT_BIN): ## Build client binary directly in /usr/local/bin
+$(INSTALL_PATH)/$(CLIENT_BIN): $(GOFILES) ## Build client binary directly in /usr/local/bin
 	sudo go build -o $(INSTALL_PATH)/$(CLIENT_BIN) $(CLIENT_DIR)
 
-$(SERVER_BIN): ## Build server binary in /usr/local/bin
+$(SERVER_BIN): $(GOFILES) ## Build server binary locally
 	go build -o $(SERVER_BIN) $(SERVER_DIR)
 
-$(CLIENT_BIN): ## Build client binary in /usr/local/bin
+$(CLIENT_BIN): $(GOFILES) ## Build client binary locally
 	go build -o $(CLIENT_BIN) $(CLIENT_DIR)
 
-clean: ## Clean local binaries
+local-clean: ## Clean local binaries
 	rm -f $(SERVER_BIN) $(CLIENT_BIN)
 
-bclean: ## Clean built binaries in /usr/local/bin
+system-clean: ## Clean built binaries in /usr/local/bin
 	sudo rm -f $(INSTALL_PATH)/$(SERVER_BIN) $(INSTALL_PATH)/$(CLIENT_BIN)
 
 server-install: $(SERVER_BIN) ## Install watchdog service
