@@ -102,8 +102,9 @@ func main() {
 	})
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "completion",
-		Short: "Generate shell completion script",
+		Use:    "completion",
+		Short:  "Generate shell completion script",
+		Hidden: true,
 		Long: `To load completions:
 	
 	Bash:
