@@ -106,7 +106,7 @@ watchdog-client status                  # View current user access states
 watchdog-client notify                  # Notify students with low time
 ```
 
-All commands are sent by default to `http://localhost:8080/commands` — override with:
+All commands are sent by default to `http://localhost:8042/commands` — override with:
 
 ```bash
 watchdog-client --url <custom-url> <command>

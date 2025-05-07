@@ -60,7 +60,7 @@ func main() {
 		Short: "Client for sending commands to the watchdog server",
 	}
 
-	rootCmd.PersistentFlags().StringVarP(&serverURL, "url", "u", "http://localhost:8080/commands", "Full URL of the server endpoint")
+	rootCmd.PersistentFlags().StringVarP(&serverURL, "url", "u", "http://localhost:8042/commands", "Full URL of the server endpoint")
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "start",
