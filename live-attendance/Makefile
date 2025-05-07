@@ -33,14 +33,14 @@ GOFILES := $(shell find . -type f -name '*.go')
 #                                         HELP                                          #
 #########################################################################################
 .PHONY: help
-
-help: 																					## Help | I am pretty sure you know what this one is doing!
-	@echo "📦  Watchdog Makefile commands:"
+help:																					## Help | I am pretty sure you know what this one is doing!
+	@printf "\033[1;34m📦 Makefile commands:\033[0m\n"
 	@grep -E '^[a-zA-Z0-9_-]+:.*?##[A-Za-z0-9 _-]+\|.*$$' $(MAKEFILE_LIST) \
-	| sort \
-	| awk 'BEGIN {FS = ":.*?##|\\|"; current=""} \
-	{ if ($$2 != current) { current = $$2; printf "   \033[32m%s\033[0m:\n", current } \
-	  printf "      \033[36m%-34s\033[0m %s\n", $$1, $$3 }'
+	| awk 'BEGIN {FS = ":.*?##|\\|"} \
+	{ gsub(/^ +| +$$/, "", $$2); \
+	  if (!seen[$$2]++) order[++i] = $$2; \
+	  data[$$2] = data[$$2] sprintf("      \033[36m%-36s\033[0m %s\n", $$1, $$3) } \
+	END { for (j = 1; j <= i; j++) { cat = order[j]; printf "   \033[32m%s\033[0m:\n%s", cat, data[cat] } }'
 
 #########################################################################################
 #                                         LOCAL                                         #
@@ -166,7 +166,7 @@ client-install-cmd-completion-bash:  													## Command completion | Instal
 	@watchdog-client completion bash | sudo tee /etc/bash_completion.d/watchdog-client > /dev/null
 	@echo "✅ Bash completion installed. You may need to restart your shell."
 
-client-uninstall-cmd-completion-zsh:  													## Command completion |  Remove zsh completion for watchdog-client
+client-uninstall-cmd-completion-zsh:  													## Command completion | Remove zsh completion for watchdog-client
 	@echo "Removing zsh completion for watchdog-client..."
 	@rm -f ~/.oh-my-zsh/completions/_watchdog-client
 	@echo "✅ Zsh completion file removed."
