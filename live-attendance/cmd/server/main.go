@@ -68,5 +68,8 @@ func main() {
 	fmt.Printf("\n") // Used to not display log on the same line as ^C
 	watchdog.Log(fmt.Sprintf("Received signal: %v. Starting graceful shutdown...", sig))
 	watchdog.PostApprenticesAttendances()
+	watchdog.AllowEvents(false)
+	watchdog.Log("Watchdog shut down successfully")
+	watchdog.Log("")
 	watchdog.CloseLogs()
 }
