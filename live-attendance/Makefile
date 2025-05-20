@@ -96,6 +96,7 @@ server-uninstall: 																		## Server | Delete watchdog.service, service
 	@echo "✅ Watchdog server uninstalled (logs kept at $(LOGFILE))"
 server-install: $(SERVER_BIN)															## Server | Uninstall watchdog service
 	sudo mkdir -p /etc/watchdog
+	sudo mkdir -p $(shell dirname $(LOGFILE))
 	sudo cp $(CONFIG_SRC) $(CONFIG_DST)
 	sudo touch $(LOGFILE)
 	sudo chown $(USER) $(LOGFILE)
@@ -127,7 +128,7 @@ server-install: $(SERVER_BIN)															## Server | Uninstall watchdog servi
 #                                        CRON                                           #
 #########################################################################################
 .PHONY: cron-setup cron-remove
-cron-setup: system-build 																## Cron | Install crontab to start/notify/stop server daily
+cron-setup: 			 																## Cron | Install crontab to start/notify/stop server daily
 	@echo "Installing cron jobs for watchdog-client..."
 	@crontab -l 2>/dev/null | grep -v 'watchdog-client' > cron.tmp || true
 	@echo "30 7  * * * /usr/local/bin/watchdog-client start" >> cron.tmp
@@ -197,3 +198,11 @@ purge:																					## Purge | Remove binaries, services, autocompletion,
 	else \
 		printf "❌ Purge cancelled.\n"; \
 	fi
+
+#########################################################################################
+#                                       ANONYMIZE                                       #
+#########################################################################################
+.PHONY: anonymize-log
+anonymize-log:                                                                                                                                                         ## Anonymize | Remove any user related data from the LOGFILE.
+       @read -p "Enter username to anonymize: " TARGET; \
+       sed -i "s/^\(\[[^]]*\] \[WATCHDOG\]\) .*$$TARGET.*/\1 Some anonymized events/" $(LOGFILE)
