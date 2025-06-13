@@ -1,8 +1,11 @@
 module watchdog
 
-go 1.23.7
+go 1.24.4
 
-require gopkg.in/yaml.v2 v2.4.0
+require (
+	github.com/TheKrainBow/go-api v1.0.0
+	gopkg.in/yaml.v2 v2.4.0
+)
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

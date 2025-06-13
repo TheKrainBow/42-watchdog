@@ -3,8 +3,9 @@ package watchdog
 import (
 	"fmt"
 	"os"
-	"watchdog/apiManager"
 	"watchdog/config"
+
+	apiManager "github.com/TheKrainBow/go-api"
 )
 
 func init() {

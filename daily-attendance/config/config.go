@@ -2,8 +2,8 @@ package config
 
 import (
 	"os"
-	"watchdog/apiManager"
 
+	apiManager "github.com/TheKrainBow/go-api"
 	"gopkg.in/yaml.v2"
 )
 

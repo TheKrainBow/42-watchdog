@@ -10,8 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"watchdog/apiManager"
 	"watchdog/config"
+
+	apiManager "github.com/TheKrainBow/go-api"
 )
 
 type UserV2 struct {

@@ -2,13 +2,8 @@ package watchdog
 
 import (
 	"fmt"
-	"net/url"
 	"time"
 )
-
-func formatTimeForURL(t time.Time) string {
-	return url.QueryEscape(t.Format("2006-01-02 15:04"))
-}
 
 func formatDuration(d time.Duration) string {
 	// Optional: Handle negative durations if they can occur
