@@ -8,9 +8,9 @@ CLIENT_BIN		:= watchdog-client
 # Service file path
 SYSTEMD_FILE	:= /etc/systemd/system/watchdog.service
 INSTALL_PATH	:= /usr/local/bin
-CONFIG_SRC		:= ./config.yml
+CONFIG_SRC		:= ../config.yml
 CONFIG_DST		:= /etc/watchdog/config.yml
-LOGFILE			:= /var/log/watchdog.log
+LOGFILE			:= /var/log/42watchdog/watchdog.log
 
 #########################################################################################
 #                                                                                       #

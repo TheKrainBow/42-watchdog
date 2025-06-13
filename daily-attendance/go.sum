@@ -1,5 +1,7 @@
 github.com/TheKrainBow/go-api v1.0.0 h1:qzJ2sLjwD+ZUlaBk5RJ48OMKgIrfa7I0rA1B4rop6vE=
 github.com/TheKrainBow/go-api v1.0.0/go.mod h1:8MQRFSe+cKR2cr+LZgkmj2tG5chnUawgoeAVkNX2hbE=
+github.com/TheKrainBow/go-api v1.0.1 h1:KxBzAHs77RSfmVKMz6kqsPSHS7AlkZ96NVNr58cnYHw=
+github.com/TheKrainBow/go-api v1.0.1/go.mod h1:8MQRFSe+cKR2cr+LZgkmj2tG5chnUawgoeAVkNX2hbE=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
