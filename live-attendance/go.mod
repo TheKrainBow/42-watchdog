@@ -3,7 +3,7 @@ module watchdog
 go 1.24.4
 
 require (
-	github.com/TheKrainBow/go-api v1.0.1
+	github.com/TheKrainBow/go-api v1.0.5
 	gopkg.in/yaml.v2 v2.4.0
 )
 
