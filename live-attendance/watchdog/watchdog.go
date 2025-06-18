@@ -411,3 +411,65 @@ func PostApprenticesAttendances() {
 	}
 	Log("[WATCHDOG] [POST] └── Done")
 }
+
+func UpdateStudent(login string, status bool) {
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		if strings.EqualFold(user.Login42, login) {
+			user.IsApprentice = status
+			AllUsers[id] = user
+			Log(fmt.Sprintf("[WATCHDOG] 🔧 Manually updated %s to apprentice=%t", user.Login42, status))
+			return
+		}
+	}
+
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not find user with login %s to update apprentice status", login))
+}
+
+func RefetchStudent(login string) {
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		if strings.EqualFold(user.Login42, login) {
+			oldStatus := user.IsApprentice
+			user.IsApprentice = false
+			for _, projectID := range config.ConfigData.ApiV2.ApprenticeProjects {
+				if isProjectOngoing(user.Login42, projectID) {
+					user.IsApprentice = true
+					break
+				}
+			}
+			AllUsers[id] = user
+			Log(fmt.Sprintf("[WATCHDOG] 🔄 Refetched status for %s: %t → %t", user.Login42, oldStatus, user.IsApprentice))
+			return
+		}
+	}
+
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not find user with login %s to refetch status", login))
+}
+
+func RefetchAllStudents() {
+	Log("[WATCHDOG] 🔁 Refetching apprentice status for all users...")
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		oldStatus := user.IsApprentice
+		user.IsApprentice = false
+		for _, projectID := range config.ConfigData.ApiV2.ApprenticeProjects {
+			if isProjectOngoing(user.Login42, projectID) {
+				user.IsApprentice = true
+				break
+			}
+		}
+		AllUsers[id] = user
+		if oldStatus != user.IsApprentice {
+			Log(fmt.Sprintf("[WATCHDOG] 🔄 Updated %s: %t → %t", user.Login42, oldStatus, user.IsApprentice))
+		}
+	}
+
+	Log("[WATCHDOG] ✅ All users' apprentice statuses have been refreshed")
+}

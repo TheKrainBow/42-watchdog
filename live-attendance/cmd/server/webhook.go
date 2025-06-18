@@ -69,6 +69,42 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			responseMessage = "Disabled listening hooks (Check server logs for more details)"
 		}
+	case "update_student_status":
+		params := cmdReq.Parameters
+		login, hasLogin := "", false
+		isAlternant, hasIsAlternant := false, false
+
+		if params != nil {
+			if l, ok := params["login"].(string); ok {
+				login = l
+				hasLogin = true
+			}
+			if alt, ok := params["is_alternant"].(bool); ok {
+				isAlternant = alt
+				hasIsAlternant = true
+			}
+		}
+
+		switch {
+		case !hasLogin:
+			watchdog.Log("[CLI] 🔁 Refetching all students' alternance status")
+			watchdog.RefetchAllStudents()
+			responseMessage = "Triggered full alternant status refresh"
+
+		case hasLogin && hasIsAlternant:
+			watchdog.Log(fmt.Sprintf("[CLI] 🔧 Forcing status of %s to alternant=%t", login, isAlternant))
+			watchdog.UpdateStudent(login, isAlternant)
+			responseMessage = fmt.Sprintf("Forced status for %s to alternant=%t", login, isAlternant)
+
+		case hasLogin:
+			watchdog.Log(fmt.Sprintf("[CLI] 🔄 Refetching status for student: %s", login))
+			watchdog.RefetchStudent(login)
+			responseMessage = fmt.Sprintf("Refetched status for %s", login)
+
+		default:
+			responseMessage = "Invalid parameters for update_student_status"
+			statusCode = http.StatusBadRequest
+		}
 	case "get_status":
 		watchdog.PrintUsersTimers()
 		responseMessage = "Check server logs for status detail"

@@ -101,6 +101,30 @@ func main() {
 		},
 	})
 
+	updateStudentCmd := &cobra.Command{
+		Use:   "update-student",
+		Short: "Refetch or force apprentice status of students",
+		Run: func(cmd *cobra.Command, args []string) {
+			login, _ := cmd.Flags().GetString("login")
+			isApprenticeFlag := cmd.Flags().Changed("is-apprentice")
+			isApprentice, _ := cmd.Flags().GetBool("is-apprentice")
+
+			params := map[string]interface{}{}
+
+			if login != "" {
+				params["login"] = login
+			}
+			if isApprenticeFlag {
+				params["is_alternant"] = isApprentice
+			}
+
+			sendCommand("update_student_status", params)
+		},
+	}
+	updateStudentCmd.Flags().String("login", "", "Login of the student")
+	updateStudentCmd.Flags().Bool("is-apprentice", false, "Force apprentice status")
+	rootCmd.AddCommand(updateStudentCmd)
+
 	rootCmd.AddCommand(&cobra.Command{
 		Use:    "completion",
 		Short:  "Generate shell completion script",
