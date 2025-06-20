@@ -166,56 +166,66 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
 }
-
 func PrintUsersTimers() {
 	parisLoc, _ := time.LoadLocation("Europe/Paris")
 	AllUsersMutex.Lock()
 	defer AllUsersMutex.Unlock()
 
-	total := len(AllUsers)
-	i := 1
-	if total == 0 {
+	if len(AllUsers) == 0 {
 		Log("[WATCHDOG] No users saved")
 		return
 	}
 
 	Log("[WATCHDOG] ┌─ Users status:")
 
-	var noBadgeUsers, badgeUsers []User
+	var (
+		naNoBadge []User // non-apprentices no badge
+		naBadge   []User // non-apprentices with badge
+		aNoBadge  []User // apprentices no badge
+		aBadge    []User // apprentices with badge
+	)
+
 	for _, user := range AllUsers {
-		if user.FirstAccess.IsZero() {
-			noBadgeUsers = append(noBadgeUsers, user)
-		} else {
-			badgeUsers = append(badgeUsers, user)
+		switch {
+		case !user.IsApprentice && user.FirstAccess.IsZero():
+			naNoBadge = append(naNoBadge, user)
+		case !user.IsApprentice && !user.FirstAccess.IsZero():
+			naBadge = append(naBadge, user)
+		case user.IsApprentice && user.FirstAccess.IsZero():
+			aNoBadge = append(aNoBadge, user)
+		case user.IsApprentice && !user.FirstAccess.IsZero():
+			aBadge = append(aBadge, user)
 		}
 	}
 
-	for _, user := range noBadgeUsers {
-		boxChar := getBoxChar(i, total)
-		Log(fmt.Sprintf("[WATCHDOG] %s %8s: %s ┆ Total : %s\n",
-			boxChar,
-			user.Login42,
-			"  No badge usage yet  ",
-			formatDuration(user.Duration),
-		))
-		i++
-	}
+	printUserGroup("├──────── Basic students: No badge usage", naNoBadge, false, parisLoc)
+	printUserGroup("├──────── Basic students: Seen today", naBadge, true, parisLoc)
+	printUserGroup("├──────── Apprentices:    No badge usage", aNoBadge, false, parisLoc)
+	printUserGroup("├──────── Apprentices:    Seen today", aBadge, true, parisLoc)
 
-	if len(badgeUsers) > 0 {
-		Log("[WATCHDOG] ├──────── Users that badged today")
-	}
+	Log("[WATCHDOG] └─ Done")
+}
 
-	i--
-	for _, user := range badgeUsers {
-		boxChar := getBoxChar(i, total)
-		Log(fmt.Sprintf("[WATCHDOG] %s %8s: %s -> %s ┆ Total : %s\n",
-			boxChar,
-			user.Login42,
-			user.FirstAccess.In(parisLoc).Format("15h04m05s"),
-			user.LastAccess.In(parisLoc).Format("15h04m05s"),
-			formatDuration(user.Duration),
-		))
-		i++
+func printUserGroup(title string, users []User, showTimes bool, loc *time.Location) {
+	if len(users) == 0 {
+		return
+	}
+	Log("[WATCHDOG] " + title)
+	for _, user := range users {
+		if showTimes {
+			Log(fmt.Sprintf("[WATCHDOG] ├── %8s: %s -> %s ┆ Total : %s\n",
+				user.Login42,
+				user.FirstAccess.In(loc).Format("15h04m05s"),
+				user.LastAccess.In(loc).Format("15h04m05s"),
+				formatDuration(user.Duration),
+			))
+		} else {
+			Log(fmt.Sprintf("[WATCHDOG] ├── %8s: %s ┆ Total : %s\n",
+				user.Login42,
+				"  No badge usage yet  ",
+				formatDuration(user.Duration),
+			))
+		}
 	}
 }
 
