@@ -52,7 +52,6 @@ func main() {
 		os.Exit(1)
 	}
 	watchdog.Log(fmt.Sprintf("[WATCHDOG] 📝 Initialiazed log file %s", logFile))
-
 	watchdog.Log(fmt.Sprintf("[WATCHDOG] 💾 Loading config using file %s", configFile))
 	config.LoadConfig(configFile)
 	err = watchdog.InitAPIs()
@@ -60,6 +59,18 @@ func main() {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
 	}
+
+	watchdog.Init(watchdog.ConfMailer{
+		SmtpServer: "smtp-relay.gmail.com",
+		SmtpPort:   587,
+		SmtpAuth:   false,
+		SmtpUser:   "",
+		SmtpPass:   "",
+		SmtpTls:    true,
+		Helo:       "pedago.42nice.fr",
+		FromName:   "Watchdog",
+		FromMail:   "pedago.watchdog.noreply@42nice.fr",
+	})
 
 	go startHTTPServer("8042")
 
