@@ -40,6 +40,27 @@ type configFile struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 	} `yaml:"42Attendance"`
+	Mail struct {
+		SMTPServer string   `yaml:"smtp_server"`
+		SMTPPort   int      `yaml:"smtp_port"`
+		SMTPAuth   bool     `yaml:"smtp_auth"`
+		SMTPUser   string   `yaml:"smtp_user"`
+		SMTPPass   string   `yaml:"smtp_pass"`
+		SMTPTLS    bool     `yaml:"smtp_tls"`
+		Helo       string   `yaml:"helo"`
+		FromName   string   `yaml:"from_name"`
+		FromMail   string   `yaml:"from_mail"`
+		Admins     []string `yaml:"admins"`
+	} `yaml:"mail"`
+	Watchtime struct {
+		Monday    []string `yaml:"monday"`
+		Tuesday   []string `yaml:"thuesday"`
+		Wednesday []string `yaml:"wednesday"`
+		Thursday  []string `yaml:"thursday"`
+		Friday    []string `yaml:"friday"`
+		Saturday  []string `yaml:"saturday"`
+		Sunday    []string `yaml:"sunday"`
+	} `yaml:"watchtime"`
 }
 
 func LoadConfig(path string) error {

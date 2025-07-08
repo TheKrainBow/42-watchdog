@@ -29,6 +29,45 @@ type UserV2 struct {
 var acceptEvents bool = false
 var acceptEventsMutex sync.Mutex
 
+type TimePeriod struct {
+	StartingTime time.Time
+	EndingTime   time.Time
+}
+
+var watchtime map[time.Weekday][]TimePeriod
+
+func InitWatchtime(watch map[time.Weekday][][]string) {
+	for key, value := range watch {
+		for _, ranges := range value {
+			first, err := time.Parse("15:04:05", ranges[0])
+			if err != nil {
+				Log(fmt.Sprintf("[ERROR] Couldn't parse watchtime `%s`", ranges[0]))
+				continue
+			}
+			last, err := time.Parse("15:04:05", ranges[1])
+			if err != nil {
+				Log(fmt.Sprintf("[ERROR] Couldn't parse watchtime `%s`", ranges[1]))
+				continue
+			}
+			watchtime[key] = append(watchtime[key], TimePeriod{
+				StartingTime: first,
+				EndingTime:   last,
+			})
+		}
+	}
+}
+
+func isTimeInWatchtime(timeStamp time.Time) bool {
+	periods := watchtime[timeStamp.Weekday()]
+
+	for _, period := range periods {
+		if timeStamp.After(period.StartingTime) && timeStamp.Before(period.EndingTime) {
+			return true
+		}
+	}
+	return false
+}
+
 func FetchMissingFields(login string, userID string) (string, string) {
 	resp, err := apiManager.GetClient(config.FTv2).Get(fmt.Sprintf("/users?filter[id]=%s&filter[login]=%s", userID, strings.ToLower(login)))
 	if err != nil {
@@ -86,7 +125,7 @@ func AllowEvents(isAllowed bool) {
 	acceptEventsMutex.Unlock()
 }
 
-func CreateNewUser(userID int, accessControlUsername string) (User, error) {
+func CreateNewUser(userID int, accessControlUsername string) (User, int, error) {
 	user := User{
 		ControlAccessID:   userID,
 		ControlAccessName: accessControlUsername,
@@ -114,15 +153,20 @@ func CreateNewUser(userID int, accessControlUsername string) (User, error) {
 	user.Login42 = res.Properties.Login
 	user.ID42 = res.Properties.ID
 	if user.Login42 == "" && user.ID42 == "" {
-		return User{}, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
+		return User{}, -1, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
 	}
 
 	if user.Login42 == "" || user.ID42 == "" {
 		user.Login42, user.ID42 = FetchMissingFields(user.Login42, user.ID42)
 	}
 
+	id := UserAlreadyExist(user.Login42)
+	if id != -1 {
+		return User{}, id, nil
+	}
+
 	if user.Login42 == "" || user.ID42 == "" {
-		return User{}, fmt.Errorf("failed to fetch Login42('%s') OR ID42('%s')", user.Login42, user.ID42)
+		return User{}, -1, fmt.Errorf("failed to fetch Login42('%s') OR ID42('%s')", user.Login42, user.ID42)
 	}
 
 	user.IsApprentice = false
@@ -137,28 +181,54 @@ func CreateNewUser(userID int, accessControlUsername string) (User, error) {
 	} else {
 		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is a basic student", user.Login42))
 	}
-	return user, nil
+	return user, -1, nil
+}
+
+func UserAlreadyExist(login string) int {
+	for key, value := range AllUsers {
+		if value.Login42 == login {
+			return key
+		}
+	}
+	return -1
 }
 
 func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.Time, doorName string) {
 	var err error
+	var userExist int
 	AllUsersMutex.Lock()
 	user, exist := AllUsers[userID]
 	if !exist {
-		user, err = CreateNewUser(userID, accessControlUsername)
+		user, userExist, err = CreateNewUser(userID, accessControlUsername)
 		if err != nil {
 			Log(fmt.Sprintf("[WATCHDOG] ❌ Failed to create user: %s\n", err.Error()))
 			AllUsersMutex.Unlock()
 			return
 		}
+		if userExist != -1 {
+			Log(fmt.Sprintf("[WATCHDOG] ⚠️ User %s already exist with a different badge ID\n", user.Login42))
+			userID = userExist
+			user = AllUsers[userID]
+		} else {
+			AllUsers[userID] = user
+		}
 	}
-	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
+
+	isInWatchtime := isTimeInWatchtime(timeStamp)
+	needPost := false
+	if isInWatchtime != acceptEvents {
+		AllowEvents(isInWatchtime)
+		if !isInWatchtime { // This is the first event we received after the end of time Period
+			needPost = true
+		}
+	}
 
 	if !acceptEvents {
 		Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s, but watchdog is sleeping", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
 		return
 	}
+
 	Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
 	if user.FirstAccess.IsZero() || user.FirstAccess.After(timeStamp) {
 		user.FirstAccess = timeStamp
@@ -171,6 +241,10 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	AllUsersMutex.Lock()
 	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
+
+	if needPost {
+		PostApprenticesAttendances()
+	}
 }
 
 func PrintUsersTimers() {
@@ -344,8 +418,7 @@ func PostApprenticesAttendances() {
 		}
 
 		if !config.ConfigData.Attendance42.AutoPost {
-			user.Status = POST_ERROR
-			user.Error = fmt.Errorf("AUTOPOST is off")
+			user.Status = POST_OFF
 			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
@@ -430,6 +503,15 @@ func PostApprenticesAttendances() {
 		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
 	}
 
+	if len(sortedUser[POST_OFF]) > 0 {
+		Log("[WATCHDOG] [POST] ├──────── Apprentices: Posts (off)")
+		for _, user := range sortedUser[POST_OFF] {
+			Log(formatPostInfo(user, parisLoc, user.Status))
+			addLogToMail(&htmlBody, user, parisLoc)
+		}
+		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+	}
+
 	if len(sortedUser[POST_ERROR]) > 0 {
 		Log("[WATCHDOG] [POST] ├──────── Apprentices: Posts errors")
 		for _, user := range sortedUser[POST_ERROR] {
@@ -489,7 +571,7 @@ func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
 		durationColor = "orange"
 	}
 
-	if user.Status != POSTED {
+	if user.Status != POSTED && user.Status != POST_OFF {
 		color = "red"
 		firstColor = "red"
 		lastColor = "red"

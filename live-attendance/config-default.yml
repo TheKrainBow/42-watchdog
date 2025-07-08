@@ -37,3 +37,12 @@ mail:
     from_name: "Watchdog"
     from_mail: "pedago.watchdog.noreply@42nice.fr"
     admins: ["florian@42nice.fr"]
+
+watchtime:
+    monday:     [["07:30:00", "20:30:00"]]
+    tuesday:    [["07:30:00", "20:30:00"]]
+    wednesday:  [["07:30:00", "20:30:00"]]
+    thursday:   [["07:30:00", "20:30:00"]]
+    friday:     [["07:30:00", "20:30:00"]]
+    saturday:   []
+    sunday:     []

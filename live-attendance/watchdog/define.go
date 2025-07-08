@@ -17,6 +17,7 @@ const (
 	APPRENTICE_BADGED_ONCE string = "Apprentice badged only once"
 	POSTED                 string = "Posted"
 	POST_ERROR             string = "Post returned an error"
+	POST_OFF               string = "AUTOPOST is off"
 )
 
 type User struct {
