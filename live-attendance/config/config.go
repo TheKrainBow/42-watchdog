@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"watchdog/mailer"
 
 	apiManager "github.com/TheKrainBow/go-api"
 	"gopkg.in/yaml.v2"
@@ -40,18 +41,18 @@ type configFile struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 	} `yaml:"42Attendance"`
-	Mail struct {
-		SMTPServer string   `yaml:"smtp_server"`
-		SMTPPort   int      `yaml:"smtp_port"`
-		SMTPAuth   bool     `yaml:"smtp_auth"`
-		SMTPUser   string   `yaml:"smtp_user"`
-		SMTPPass   string   `yaml:"smtp_pass"`
-		SMTPTLS    bool     `yaml:"smtp_tls"`
+	Mailer struct {
+		SmtpServer string   `yaml:"smtp_server"`
+		SmtpPort   int      `yaml:"smtp_port"`
+		SmtpAuth   bool     `yaml:"smtp_auth"`
+		SmtpUser   string   `yaml:"smtp_user"`
+		SmtpPass   string   `yaml:"smtp_pass"`
+		SmtpTLS    bool     `yaml:"smtp_tls"`
 		Helo       string   `yaml:"helo"`
 		FromName   string   `yaml:"from_name"`
 		FromMail   string   `yaml:"from_mail"`
-		Admins     []string `yaml:"admins"`
-	} `yaml:"mail"`
+		Recipients []string `yaml:"recipients"`
+	} `yaml:"mailer"`
 	Watchtime struct {
 		Monday    []string `yaml:"monday"`
 		Tuesday   []string `yaml:"thuesday"`
@@ -102,5 +103,18 @@ func LoadConfig(path string) error {
 	if err != nil {
 		return err
 	}
+
+	mailer.InitMailer(mailer.ConfMailer{
+		SmtpServer: ConfigData.Mailer.SmtpServer,
+		SmtpPort:   ConfigData.Mailer.SmtpPort,
+		SmtpAuth:   ConfigData.Mailer.SmtpAuth,
+		SmtpUser:   ConfigData.Mailer.SmtpUser,
+		SmtpPass:   ConfigData.Mailer.SmtpPass,
+		SmtpTls:    ConfigData.Mailer.SmtpTLS,
+		Helo:       ConfigData.Mailer.Helo,
+		FromName:   ConfigData.Mailer.FromName,
+		FromMail:   ConfigData.Mailer.FromMail,
+		Recipients: ConfigData.Mailer.Recipients,
+	})
 	return nil
 }

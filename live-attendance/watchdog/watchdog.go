@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 	"watchdog/config"
+	"watchdog/mailer"
 
 	apiManager "github.com/TheKrainBow/go-api"
 )
@@ -125,6 +126,19 @@ func AllowEvents(isAllowed bool) {
 	acceptEventsMutex.Unlock()
 }
 
+func GetBadgeByLogin(login string) int {
+	if AllUsersMutex.TryLock() {
+		AllUsersMutex.Lock()
+		defer AllUsersMutex.Unlock()
+	}
+	for key, value := range AllUsers {
+		if value.Login42 == login {
+			return key
+		}
+	}
+	return -1
+}
+
 func CreateNewUser(userID int, accessControlUsername string) (User, int, error) {
 	user := User{
 		ControlAccessID:   userID,
@@ -160,13 +174,13 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 		user.Login42, user.ID42 = FetchMissingFields(user.Login42, user.ID42)
 	}
 
-	id := UserAlreadyExist(user.Login42)
-	if id != -1 {
-		return User{}, id, nil
-	}
-
 	if user.Login42 == "" || user.ID42 == "" {
 		return User{}, -1, fmt.Errorf("failed to fetch Login42('%s') OR ID42('%s')", user.Login42, user.ID42)
+	}
+
+	badgeID := GetBadgeByLogin(user.Login42)
+	if badgeID != -1 {
+		return user, badgeID, nil
 	}
 
 	user.IsApprentice = false
@@ -184,33 +198,22 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 	return user, -1, nil
 }
 
-func UserAlreadyExist(login string) int {
-	for key, value := range AllUsers {
-		if value.Login42 == login {
-			return key
-		}
-	}
-	return -1
-}
-
 func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.Time, doorName string) {
 	var err error
-	var userExist int
+	var badge int
 	AllUsersMutex.Lock()
 	user, exist := AllUsers[userID]
 	if !exist {
-		user, userExist, err = CreateNewUser(userID, accessControlUsername)
+		user, badge, err = CreateNewUser(userID, accessControlUsername)
 		if err != nil {
 			Log(fmt.Sprintf("[WATCHDOG] ❌ Failed to create user: %s\n", err.Error()))
 			AllUsersMutex.Unlock()
 			return
 		}
-		if userExist != -1 {
-			Log(fmt.Sprintf("[WATCHDOG] ⚠️ User %s already exist with a different badge ID\n", user.Login42))
-			userID = userExist
-			user = AllUsers[userID]
-		} else {
-			AllUsers[userID] = user
+		if badge != -1 {
+			Log(fmt.Sprintf("[WATCHDOG] ⚠️  User %s is already registered with %d. %d is a tmp badge?\n", user.Login42, badge, userID))
+			user = AllUsers[badge]
+			userID = badge
 		}
 	}
 	AllUsersMutex.Unlock()
@@ -375,6 +378,67 @@ func resetUserDuration(user User) {
 	AllUsers[user.ControlAccessID] = user
 }
 
+func SinglePostApprentice(user User) {
+	parisLoc, _ := time.LoadLocation("Europe/Paris")
+	defer func() {
+		resetUserDuration(user)
+		Log(formatPostInfo(user, parisLoc, user.Status))
+	}()
+	if user.FirstAccess.IsZero() {
+		if user.IsApprentice {
+			user.Status = APPRENTICE_NO_BADGE
+		} else {
+			user.Status = NO_BADGE
+		}
+		return
+	}
+
+	id42, _ := strconv.ParseInt(user.ID42, 10, 64)
+
+	if user.FirstAccess.Equal(user.LastAccess) {
+		if user.IsApprentice {
+			user.Status = APPRENTICE_BADGED_ONCE
+		} else {
+			user.Status = BADGED_ONCE
+		}
+		return
+	}
+
+	if !user.IsApprentice {
+		user.Status = NOT_APPRENTICE
+		return
+	}
+
+	if !config.ConfigData.Attendance42.AutoPost {
+		user.Status = POST_ERROR
+		user.Error = fmt.Errorf("AUTOPOST is off")
+		return
+	}
+
+	resp, err := apiManager.GetClient(config.FTAttendance).Post("/attendances", APIAttendance{
+		Begin_at:  user.FirstAccess.UTC().Format(time.RFC3339),
+		End_at:    user.LastAccess.UTC().Format(time.RFC3339),
+		Source:    "access-control",
+		Campus_id: 41,
+		User_id:   int(id42),
+	})
+
+	if err != nil {
+		user.Status = POST_ERROR
+		user.Error = err
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		user.Status = POST_ERROR
+		user.Error = fmt.Errorf("%s", resp.Status)
+		return
+	}
+
+	user.Status = POSTED
+	user.Error = nil
+}
+
 func PostApprenticesAttendances() {
 	parisLoc, _ := time.LoadLocation("Europe/Paris")
 	sortedUser := map[string][]User{}
@@ -488,6 +552,7 @@ func PostApprenticesAttendances() {
 	// LOG AND MAIL APPRENTICES:
 
 	var htmlBody strings.Builder
+	atLeastOneField := false
 	today := time.Now()
 	htmlBody.WriteString("<h2>Watchdog Daily Report – " + today.Format("02/01/2006") + "</h2>")
 	htmlBody.WriteString(`
@@ -501,6 +566,7 @@ func PostApprenticesAttendances() {
 			addLogToMail(&htmlBody, user, parisLoc)
 		}
 		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+		atLeastOneField = true
 	}
 
 	if len(sortedUser[POST_OFF]) > 0 {
@@ -518,7 +584,7 @@ func PostApprenticesAttendances() {
 			Log(formatPostInfo(user, parisLoc, user.Error.Error()))
 			addLogToMail(&htmlBody, user, parisLoc)
 		}
-		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+		atLeastOneField = true
 	}
 
 	if len(sortedUser[APPRENTICE_BADGED_ONCE]) > 0 {
@@ -527,7 +593,7 @@ func PostApprenticesAttendances() {
 			Log(formatPostInfo(user, parisLoc, "Used badge only once"))
 			addLogToMail(&htmlBody, user, parisLoc)
 		}
-		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+		atLeastOneField = true
 	}
 
 	if len(sortedUser[APPRENTICE_NO_BADGE]) > 0 {
@@ -536,11 +602,18 @@ func PostApprenticesAttendances() {
 			Log(formatPostInfo(user, parisLoc, "No badge used today"))
 			addLogToMail(&htmlBody, user, parisLoc)
 		}
-		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+		atLeastOneField = true
 	}
 	htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
-	htmlBody.WriteString(`</table><p style="font-size:11px; color:#888;">Generated by Watchdog at ` + today.Format("15:04:05") + ` - Timezone is CEST</p>`)
-	Send(Recipients, fmt.Sprintf("Watchdog – Daily Report - %s", time.Now().Format("02/01/2006")), htmlBody.String(), true)
+	htmlBody.WriteString(`</table><p style="font-size:11px; color:#888;">Generated by Watchdog at ` + today.Format("15:04:05") + ` - Timezone is CEST &nbsp;</p>`)
+	if atLeastOneField {
+		mailer.Send(mailer.GetRecipients(), fmt.Sprintf("Watchdog – Daily Report - %s", time.Now().Format("02/01/2006")), htmlBody.String(), true)
+	}
+
+	for key, user := range AllUsers {
+		user.Error = nil
+		AllUsers[key] = user
+	}
 }
 
 func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
@@ -565,6 +638,16 @@ func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
 		lastColor = "orange"
 	}
 
+	firstFormated := first.Format("15:04:05")
+	if first.IsZero() {
+		firstFormated = "00:00:00"
+	}
+
+	lastFormated := last.Format("15:04:05")
+	if last.IsZero() {
+		lastFormated = "00:00:00"
+	}
+
 	if user.Duration < 5*time.Hour {
 		durationColor = "red"
 	} else if user.Duration < 7*time.Hour {
@@ -582,11 +665,28 @@ func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
 	htmlBody.WriteString(`<tr><td style="white-space: pre; font-family: Menlo, Consolas, 'Courier New', monospace; font-size: 13px; padding: 1px 20px; line-height: 1;">`)
 	htmlBody.WriteString(`<span style="color: green;">` + emoji + `</span> `)
 	htmlBody.WriteString(`<span style="color:` + color + `;">` + fmt.Sprintf("%-8s", user.Login42) + `</span>: `)
-	htmlBody.WriteString(`<span style="color:` + firstColor + `;">` + first.Format("15:04:05") + `</span>-`)
-	htmlBody.WriteString(`<span style="color:` + lastColor + `;">` + last.Format("15:04:05") + `</span> `)
+	htmlBody.WriteString(`<span style="color:` + firstColor + `;">` + firstFormated + `</span>-`)
+	htmlBody.WriteString(`<span style="color:` + lastColor + `;">` + lastFormated + `</span> `)
 	htmlBody.WriteString(`<span style="color:` + durationColor + `;">` + formatDuration(user.Duration) + `</span> — `)
 	htmlBody.WriteString(`<span style="color:` + color + `;">` + msg + `</span>`)
 	htmlBody.WriteString(`</td></tr>`)
+}
+
+func DeleteStudent(login string, withPost bool) {
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		if strings.EqualFold(user.Login42, login) {
+			if withPost {
+				SinglePostApprentice(user)
+			}
+			delete(AllUsers, id)
+			Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted user %s from Watchdog", user.Login42))
+			return
+		}
+	}
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not delete user with login %s: user not found", login))
 }
 
 func UpdateStudent(login string, status bool) {
@@ -601,7 +701,7 @@ func UpdateStudent(login string, status bool) {
 			return
 		}
 	}
-	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not find user with login %s to update apprentice status", login))
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not update user with login %s: user not found", login))
 }
 
 func RefetchStudent(login string) {

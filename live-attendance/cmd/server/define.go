@@ -32,7 +32,7 @@ type CAPayload struct {
 	DateTime string      `json:"datetime"` // Consider parsing to time.Time after unmarshalling
 	Category string      `json:"category"`
 	Action   string      `json:"action"`
-	Operator interface{} `json:"operator"` // Use interface{} for unknown or potentially varying null types
+	Operator any         `json:"operator"` // Use any for unknown or potentially varying null types
 	Data     CAEventData `json:"data"`
 }
 
@@ -41,6 +41,6 @@ type CommandPayload struct {
 }
 
 type CommandRequest struct {
-	Command    string                 `json:"command"`
-	Parameters map[string]interface{} `json:"parameters,omitempty"` // Use a map for flexible parameters
+	Command    string         `json:"command"`
+	Parameters map[string]any `json:"parameters,omitempty"` // Use a map for flexible parameters
 }

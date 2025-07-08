@@ -1,7 +1,3 @@
-github.com/TheKrainBow/go-api v1.0.0 h1:qzJ2sLjwD+ZUlaBk5RJ48OMKgIrfa7I0rA1B4rop6vE=
-github.com/TheKrainBow/go-api v1.0.0/go.mod h1:8MQRFSe+cKR2cr+LZgkmj2tG5chnUawgoeAVkNX2hbE=
-github.com/TheKrainBow/go-api v1.0.1 h1:KxBzAHs77RSfmVKMz6kqsPSHS7AlkZ96NVNr58cnYHw=
-github.com/TheKrainBow/go-api v1.0.1/go.mod h1:8MQRFSe+cKR2cr+LZgkmj2tG5chnUawgoeAVkNX2hbE=
 github.com/TheKrainBow/go-api v1.0.5 h1:fEitira9xK9uiGTP8AVGT4ADKAxefNoao0mhIoHCsKw=
 github.com/TheKrainBow/go-api v1.0.5/go.mod h1:8MQRFSe+cKR2cr+LZgkmj2tG5chnUawgoeAVkNX2hbE=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=

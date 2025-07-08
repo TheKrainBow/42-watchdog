@@ -59,19 +59,6 @@ func main() {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
 	}
-
-	watchdog.Init(watchdog.ConfMailer{
-		SmtpServer: "smtp-relay.gmail.com",
-		SmtpPort:   587,
-		SmtpAuth:   false,
-		SmtpUser:   "",
-		SmtpPass:   "",
-		SmtpTls:    true,
-		Helo:       "pedago.42nice.fr",
-		FromName:   "Watchdog",
-		FromMail:   "pedago.watchdog.noreply@42nice.fr",
-	})
-
 	go startHTTPServer("8042")
 
 	// Wait a SIGINT or SIGTERM signal to stop

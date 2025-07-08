@@ -1,4 +1,4 @@
-package watchdog
+package mailer
 
 import (
 	"crypto/tls"
@@ -14,47 +14,55 @@ import (
 type ConfMailer struct {
 	SmtpServer string   `yaml:"smtp_server"`
 	SmtpPort   int      `yaml:"smtp_port"`
-	SmtpAuth   bool     `yaml:"smtp_auth"`
+	SmtpAuth   bool     `yaml:"smtp_Auth"`
 	SmtpUser   string   `yaml:"smtp_user"`
 	SmtpPass   string   `yaml:"smtp_pass"`
 	SmtpTls    bool     `yaml:"smtp_tls"`
-	Helo       string   `yaml:"helo"`
+	Helo       string   `yaml:"Helo"`
 	FromName   string   `yaml:"from_name"`
 	FromMail   string   `yaml:"from_mail"`
-	Admins     []string `yaml:"admins"`
+	Recipients []string `yaml:"recipients"`
 }
 
 type mailer struct {
-	smtpServer string
-	smtpPort   int
-	smtpAuth   bool
-	smtpUser   string
-	smtpPass   string
-	smtpTls    bool
-	helo       string
-	fromName   string
-	fromMail   string
-	auth       smtp.Auth
-	client     *smtp.Client
-	admins     []string
+	SmtpServer string
+	SmtpPort   int
+	SmtpAuth   bool
+	SmtpUser   string
+	SmtpPass   string
+	SmtpTls    bool
+	Helo       string
+	FromName   string
+	FromMail   string
+	Auth       smtp.Auth
+	Client     *smtp.Client
+	Recipients []string
 }
 
 var m mailer
 
-func Init(conf ConfMailer) {
+func GetConf() mailer {
+	return m
+}
+
+func GetRecipients() []string {
+	return m.Recipients
+}
+
+func InitMailer(conf ConfMailer) {
 	m = mailer{
-		smtpPort:   conf.SmtpPort,
-		smtpUser:   conf.SmtpUser,
-		smtpPass:   conf.SmtpPass,
-		smtpServer: conf.SmtpServer,
-		smtpAuth:   conf.SmtpAuth,
-		smtpTls:    conf.SmtpTls,
-		helo:       conf.Helo,
-		fromName:   conf.FromName,
-		fromMail:   conf.FromMail,
-		admins:     conf.Admins,
-		auth:       nil,
-		client:     nil,
+		SmtpPort:   conf.SmtpPort,
+		SmtpUser:   conf.SmtpUser,
+		SmtpPass:   conf.SmtpPass,
+		SmtpServer: conf.SmtpServer,
+		SmtpAuth:   conf.SmtpAuth,
+		SmtpTls:    conf.SmtpTls,
+		Helo:       conf.Helo,
+		FromName:   conf.FromName,
+		FromMail:   conf.FromMail,
+		Recipients: conf.Recipients,
+		Auth:       nil,
+		Client:     nil,
 	}
 }
 
@@ -62,54 +70,54 @@ func Send(to []string, subject string, body string, html bool) error {
 	var err error
 
 	// Connection to the remote SMTP server
-	if m.client, err = smtp.Dial(m.smtpServer + ":" + strconv.Itoa(m.smtpPort)); err != nil {
+	if m.Client, err = smtp.Dial(m.SmtpServer + ":" + strconv.Itoa(m.SmtpPort)); err != nil {
 		return err
 	}
-	defer m.client.Close()
+	defer m.Client.Close()
 
 	// Sending HELO / EHLO message to the server
-	if err = m.client.Hello(m.helo); err != nil {
-		m.client.Reset()
+	if err = m.Client.Hello(m.Helo); err != nil {
+		m.Client.Reset()
 		return err
 	}
 
 	// Start TLS command if server requires it
-	if m.smtpTls {
-		if err = m.client.StartTLS(
+	if m.SmtpTls {
+		if err = m.Client.StartTLS(
 			&tls.Config{
-				ServerName:         m.smtpServer,
+				ServerName:         m.SmtpServer,
 				InsecureSkipVerify: true}); err != nil {
-			m.client.Reset()
+			m.Client.Reset()
 			return err
 		}
 	}
 
 	// SMTP Authentication
-	if m.smtpAuth {
-		if err = m.client.Auth(smtp.PlainAuth("", m.smtpUser, m.smtpPass, m.smtpServer)); err != nil {
-			m.client.Reset()
+	if m.SmtpAuth {
+		if err = m.Client.Auth(smtp.PlainAuth("", m.SmtpUser, m.SmtpPass, m.SmtpServer)); err != nil {
+			m.Client.Reset()
 			return err
 		}
 	}
 
 	// Set the sender
-	if err = m.client.Mail(m.fromMail); err != nil {
-		m.client.Reset()
+	if err = m.Client.Mail(m.FromMail); err != nil {
+		m.Client.Reset()
 		return err
 	}
 
 	// Set the recipients
 	for _, r := range to {
-		if err = m.client.Rcpt(r); err != nil {
-			m.client.Reset()
+		if err = m.Client.Rcpt(r); err != nil {
+			m.Client.Reset()
 			return nil
 		}
 	}
 
 	// Prepare the body
 	var wc io.WriteCloser
-	if wc, err = m.client.Data(); err != nil {
-		m.client.Reset()
+	if wc, err = m.Client.Data(); err != nil {
+		m.Client.Reset()
 		return err
 	}
 	var data string
@@ -117,29 +125,29 @@ func Send(to []string, subject string, body string, html bool) error {
 
 		data = string(
 			composeHTML(to,
-				m.fromName+"<"+m.fromMail+">",
+				m.FromName+"<"+m.FromMail+">",
 				subject,
 				body))
 	} else {
 
 		data = string(
 			compose(to,
-				m.fromName+"<"+m.fromMail+">",
+				m.FromName+"<"+m.FromMail+">",
 				subject,
 				body))
 	}
 	if _, err = io.WriteString(wc, data); err != nil {
-		m.client.Reset()
+		m.Client.Reset()
 		return err
 	}
 	if err = wc.Close(); err != nil {
-		m.client.Reset()
+		m.Client.Reset()
 		return err
 	}
 
 	// Send the QUIT command and close connection
-	if err = m.client.Quit(); err != nil {
-		m.client.Reset()
+	if err = m.Client.Quit(); err != nil {
+		m.Client.Reset()
 		return err
 	}
 

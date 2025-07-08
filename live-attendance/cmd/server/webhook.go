@@ -87,24 +87,47 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 
 		switch {
 		case !hasLogin:
-			watchdog.Log("[CLI] 🔁 Refetching all students' alternance status")
+			watchdog.Log("[CLI] 🔁 Refetching all student's alternance status")
 			watchdog.RefetchAllStudents()
 			responseMessage = "Triggered full alternant status refresh"
+
+		case hasLogin && !hasIsAlternant:
+			watchdog.Log(fmt.Sprintf("[CLI] 🔄 Refetching status for student: %s", login))
+			watchdog.RefetchStudent(login)
+			responseMessage = fmt.Sprintf("Refetched status for %s", login)
 
 		case hasLogin && hasIsAlternant:
 			watchdog.Log(fmt.Sprintf("[CLI] 🔧 Forcing status of %s to alternant=%t", login, isAlternant))
 			watchdog.UpdateStudent(login, isAlternant)
 			responseMessage = fmt.Sprintf("Forced status for %s to alternant=%t", login, isAlternant)
 
-		case hasLogin:
-			watchdog.Log(fmt.Sprintf("[CLI] 🔄 Refetching status for student: %s", login))
-			watchdog.RefetchStudent(login)
-			responseMessage = fmt.Sprintf("Refetched status for %s", login)
-
 		default:
 			responseMessage = "Invalid parameters for update_student_status"
 			statusCode = http.StatusBadRequest
 		}
+
+	case "delete_student":
+		params := cmdReq.Parameters
+		login, hasLogin := "", false
+
+		if params != nil {
+			if l, ok := params["login"].(string); ok {
+				login = l
+				hasLogin = true
+			}
+		}
+
+		switch {
+		case hasLogin:
+			watchdog.Log(fmt.Sprintf("[CLI] 🗑️ Deleting student %s", login))
+			watchdog.DeleteStudent(login, true)
+			responseMessage = fmt.Sprintf("Deleted student %s", login)
+
+		default:
+			responseMessage = "You must provide a login to delete"
+			statusCode = http.StatusBadRequest
+		}
+
 	case "get_status":
 		watchdog.PrintUsersTimers()
 		responseMessage = "Check server logs for status detail"
