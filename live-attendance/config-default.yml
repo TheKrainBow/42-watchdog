@@ -26,3 +26,14 @@ AccessControl:
     username: "YOUR_42STAFF_USERNAME"
     password: "YOUR_42STAFF_PASSWORD"
 
+mailer:
+    smtp_server: ""
+    smtp_port: 4242
+    smtp_auth: false
+    smtp_user: ""
+    smtp_pass: ""
+    smtp_tls: true
+    helo: ""
+    from_name: ""
+    from_mail: ""
+    recipients: ["heinz@42nice.fr"]

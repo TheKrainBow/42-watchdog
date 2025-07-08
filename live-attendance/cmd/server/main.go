@@ -52,7 +52,6 @@ func main() {
 		os.Exit(1)
 	}
 	watchdog.Log(fmt.Sprintf("[WATCHDOG] 📝 Initialiazed log file %s", logFile))
-
 	watchdog.Log(fmt.Sprintf("[WATCHDOG] 💾 Loading config using file %s", configFile))
 	config.LoadConfig(configFile)
 	err = watchdog.InitAPIs()

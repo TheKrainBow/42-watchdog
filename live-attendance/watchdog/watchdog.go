@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"watchdog/config"
+	"watchdog/mailer"
 
 	apiManager "github.com/TheKrainBow/go-api"
 )
@@ -80,7 +82,20 @@ func AllowEvents(isAllowed bool) {
 	acceptEventsMutex.Unlock()
 }
 
-func CreateNewUser(userID int, accessControlUsername string) (User, error) {
+func GetBadgeByLogin(login string) int {
+	if AllUsersMutex.TryLock() {
+		AllUsersMutex.Lock()
+		defer AllUsersMutex.Unlock()
+	}
+	for key, value := range AllUsers {
+		if value.Login42 == login {
+			return key
+		}
+	}
+	return -1
+}
+
+func CreateNewUser(userID int, accessControlUsername string) (User, int, error) {
 	user := User{
 		ControlAccessID:   userID,
 		ControlAccessName: accessControlUsername,
@@ -108,7 +123,7 @@ func CreateNewUser(userID int, accessControlUsername string) (User, error) {
 	user.Login42 = res.Properties.Login
 	user.ID42 = res.Properties.ID
 	if user.Login42 == "" && user.ID42 == "" {
-		return User{}, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
+		return User{}, -1, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
 	}
 
 	if user.Login42 == "" || user.ID42 == "" {
@@ -116,7 +131,12 @@ func CreateNewUser(userID int, accessControlUsername string) (User, error) {
 	}
 
 	if user.Login42 == "" || user.ID42 == "" {
-		return User{}, fmt.Errorf("failed to fetch Login42('%s') OR ID42('%s')", user.Login42, user.ID42)
+		return User{}, -1, fmt.Errorf("failed to fetch Login42('%s') OR ID42('%s')", user.Login42, user.ID42)
+	}
+
+	badgeID := GetBadgeByLogin(user.Login42)
+	if badgeID != -1 {
+		return user, badgeID, nil
 	}
 
 	user.IsApprentice = false
@@ -131,29 +151,35 @@ func CreateNewUser(userID int, accessControlUsername string) (User, error) {
 	} else {
 		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is a basic student", user.Login42))
 	}
-	return user, nil
+	return user, -1, nil
 }
 
 func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.Time, doorName string) {
 	var err error
+	var badge int
 	AllUsersMutex.Lock()
 	user, exist := AllUsers[userID]
 	if !exist {
-		user, err = CreateNewUser(userID, accessControlUsername)
+		user, badge, err = CreateNewUser(userID, accessControlUsername)
 		if err != nil {
 			Log(fmt.Sprintf("[WATCHDOG] ❌ Failed to create user: %s\n", err.Error()))
 			AllUsersMutex.Unlock()
 			return
+		}
+		if badge != -1 {
+			Log(fmt.Sprintf("[WATCHDOG] ⚠️  User %s is already registered with %d. %d is a tmp badge?\n", user.Login42, badge, userID))
+			user = AllUsers[badge]
+			userID = badge
 		}
 	}
 	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
 
 	if !acceptEvents {
-		Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s, but watchdog is sleeping", user.Login42, doorName))
+		Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s, but watchdog is sleeping", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
 		return
 	}
-	Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s", user.Login42, doorName))
+	Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
 	if user.FirstAccess.IsZero() || user.FirstAccess.After(timeStamp) {
 		user.FirstAccess = timeStamp
 		user.Duration = user.LastAccess.Sub(user.FirstAccess)
@@ -166,6 +192,7 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
 }
+
 func PrintUsersTimers() {
 	parisLoc, _ := time.LoadLocation("Europe/Paris")
 	AllUsersMutex.Lock()
@@ -263,36 +290,29 @@ type APIAttendance struct {
 	User_id   int    `json:"user_id"`
 }
 
-func getBoxChar(i int, len int) string {
-	if i == len {
-		return "└──"
-	} else {
-		return "├──"
+func formatPostInfo(user User, loc *time.Location, msg string) string {
+	first := "00:00:00"
+	last := "00:00:00"
+	if !user.FirstAccess.IsZero() {
+		first = user.FirstAccess.In(loc).Format("15:04:05")
 	}
-}
-
-func formatPostInfo(logs map[string][]string, errorType string, user User, loc *time.Location, emoji string, msg string) map[string][]string {
-	apprenticeEmoji := "👤"
-	if user.IsApprentice {
-		apprenticeEmoji = "🎓"
+	if !user.LastAccess.IsZero() {
+		last = user.LastAccess.In(loc).Format("15:04:05")
 	}
-	logs[apprenticeEmoji+errorType] = append(logs[apprenticeEmoji+errorType], fmt.Sprintf(
-		"[WATCHDOG] [POST] ├── %s %-8s: %s-%s (%s) — %s\n",
+	emoji := "✅"
+	if user.Status != POSTED {
+		emoji = "❌"
+	}
+	return fmt.Sprintf(
+		"[WATCHDOG] [POST] ├── %s %-8s: %s %s %s — %s\n",
 		emoji,
 		user.Login42,
-		user.FirstAccess.In(loc).Format("15:04:05"),
-		user.LastAccess.In(loc).Format("15:04:05"),
+		first,
+		last,
 		formatDuration(user.Duration),
 		msg,
-	))
-	return logs
+	)
 }
-
-const NO_BADGE string = "No badge"
-const BADGED_ONCE string = "Badged once"
-const NOT_APPRENTICE string = "Not apprentice"
-const POSTED string = "posted"
-const OTHER string = "Other"
 
 func resetUserDuration(user User) {
 	user.FirstAccess = time.Time{}
@@ -301,48 +321,113 @@ func resetUserDuration(user User) {
 	AllUsers[user.ControlAccessID] = user
 }
 
+func SinglePostApprentice(user User) {
+	parisLoc, _ := time.LoadLocation("Europe/Paris")
+	defer func() {
+		resetUserDuration(user)
+		Log(formatPostInfo(user, parisLoc, user.Status))
+	}()
+	if user.FirstAccess.IsZero() {
+		if user.IsApprentice {
+			user.Status = APPRENTICE_NO_BADGE
+		} else {
+			user.Status = NO_BADGE
+		}
+		return
+	}
+
+	id42, _ := strconv.ParseInt(user.ID42, 10, 64)
+
+	if user.FirstAccess.Equal(user.LastAccess) {
+		if user.IsApprentice {
+			user.Status = APPRENTICE_BADGED_ONCE
+		} else {
+			user.Status = BADGED_ONCE
+		}
+		return
+	}
+
+	if !user.IsApprentice {
+		user.Status = NOT_APPRENTICE
+		return
+	}
+
+	if !config.ConfigData.Attendance42.AutoPost {
+		user.Status = POST_ERROR
+		user.Error = fmt.Errorf("AUTOPOST is off")
+		return
+	}
+
+	resp, err := apiManager.GetClient(config.FTAttendance).Post("/attendances", APIAttendance{
+		Begin_at:  user.FirstAccess.UTC().Format(time.RFC3339),
+		End_at:    user.LastAccess.UTC().Format(time.RFC3339),
+		Source:    "access-control",
+		Campus_id: 41,
+		User_id:   int(id42),
+	})
+
+	if err != nil {
+		user.Status = POST_ERROR
+		user.Error = err
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		user.Status = POST_ERROR
+		user.Error = fmt.Errorf("%s", resp.Status)
+		return
+	}
+
+	user.Status = POSTED
+	user.Error = nil
+}
+
 func PostApprenticesAttendances() {
 	parisLoc, _ := time.LoadLocation("Europe/Paris")
-	logs := map[string][]string{}
+	sortedUser := map[string][]User{}
 	AllUsersMutex.Lock()
 	defer AllUsersMutex.Unlock()
 	total := len(AllUsers)
-	i := 0
 	if total == 0 {
 		Log("[WATCHDOG] [POST] Posting Attendances: no users registered")
 		return
 	}
-	Log("[WATCHDOG] [POST] ┌─ Posting Attendances:")
 	for _, user := range AllUsers {
-		i++
 		if user.FirstAccess.IsZero() {
-			logs = formatPostInfo(logs, NO_BADGE, user, parisLoc, "❌", "No badge usage yet")
+			if user.IsApprentice {
+				user.Status = APPRENTICE_NO_BADGE
+			} else {
+				user.Status = NO_BADGE
+			}
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
 
 		id42, _ := strconv.ParseInt(user.ID42, 10, 64)
 
-		if user.FirstAccess == user.LastAccess {
-			logs = formatPostInfo(logs, BADGED_ONCE, user, parisLoc, "❌", "Used badge only once")
+		if user.FirstAccess.Equal(user.LastAccess) {
+			if user.IsApprentice {
+				user.Status = APPRENTICE_BADGED_ONCE
+			} else {
+				user.Status = BADGED_ONCE
+			}
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
 
-		// if user.Duration < time.Duration(60*10) {
-		// 	logs = formatPostInfo(logs, OTHER, user, parisLoc, "❌", fmt.Sprintf("(too short duration %.2f minutes)", user.Duration.Minutes()))
-		// 	resetUserDuration(user)
-		// 	continue
-		// }
-
 		if !user.IsApprentice {
-			logs = formatPostInfo(logs, NOT_APPRENTICE, user, parisLoc, "❌", "user is not an apprentice")
+			user.Status = NOT_APPRENTICE
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
 
 		if !config.ConfigData.Attendance42.AutoPost {
-			logs = formatPostInfo(logs, POSTED, user, parisLoc, "❌", "AUTOPOST is OFF")
+			user.Status = POST_ERROR
+			user.Error = fmt.Errorf("AUTOPOST is off")
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
@@ -356,70 +441,187 @@ func PostApprenticesAttendances() {
 		})
 
 		if err != nil {
-			logs = formatPostInfo(logs, POSTED, user, parisLoc, "❌", err.Error())
+			user.Status = POST_ERROR
+			user.Error = err
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			logs = formatPostInfo(logs, POSTED, user, parisLoc, "❌", resp.Status)
+			user.Status = POST_ERROR
+			user.Error = fmt.Errorf("%s", resp.Status)
+			sortedUser[user.Status] = append(sortedUser[user.Status], user)
 			resetUserDuration(user)
 			continue
 		}
 
-		logs = formatPostInfo(logs, POSTED, user, parisLoc, "✅", resp.Status)
+		user.Status = POSTED
+		user.Error = nil
+		sortedUser[user.Status] = append(sortedUser[user.Status], user)
 		resetUserDuration(user)
 	}
 
-	if len(logs["👤"+NO_BADGE]) > 0 {
+	for status, users := range sortedUser {
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].Login42 < users[j].Login42 // or .Login42, etc.
+		})
+		sortedUser[status] = users // update the map with the sorted slice
+	}
+
+	// LOG NON APPRENTICE USERS:
+
+	Log("[WATCHDOG] [POST] ┌─ Posting Attendances:")
+	if len(sortedUser[NO_BADGE]) > 0 {
 		Log("[WATCHDOG] [POST] ├──────── Students: No badge used today")
-		for _, line := range logs["👤"+NO_BADGE] {
-			Log(line)
+		for _, user := range sortedUser[NO_BADGE] {
+			Log(formatPostInfo(user, parisLoc, user.Status))
 		}
 	}
 
-	if len(logs["👤"+BADGED_ONCE]) > 0 {
+	if len(sortedUser[BADGED_ONCE]) > 0 {
 		Log("[WATCHDOG] [POST] ├──────── Students: Used badge only once")
-		for _, line := range logs["👤"+BADGED_ONCE] {
-			Log(line)
+		for _, user := range sortedUser[BADGED_ONCE] {
+			Log(formatPostInfo(user, parisLoc, user.Status))
 		}
 	}
 
-	if len(logs["👤"+NOT_APPRENTICE]) > 0 {
+	if len(sortedUser[NOT_APPRENTICE]) > 0 {
 		Log("[WATCHDOG] [POST] ├──────── Students: Not an apprentice")
-		for _, line := range logs["👤"+NOT_APPRENTICE] {
-			Log(line)
+		for _, user := range sortedUser[NOT_APPRENTICE] {
+			Log(formatPostInfo(user, parisLoc, user.Status))
 		}
 	}
 
-	if len(logs["👤"+OTHER]) > 0 {
-		Log("[WATCHDOG] [POST] ├──────── Students: Other issues")
-		for _, line := range logs["👤"+OTHER] {
-			Log(line)
-		}
-	}
+	// LOG AND MAIL APPRENTICES:
 
-	if len(logs["🎓"+NO_BADGE]) > 0 {
-		Log("[WATCHDOG] [POST] ├──────── Apprentices: No badge used today")
-		for _, line := range logs["🎓"+NO_BADGE] {
-			Log(line)
-		}
-	}
-
-	if len(logs["🎓"+BADGED_ONCE]) > 0 {
-		Log("[WATCHDOG] [POST] ├──────── Apprentices: Used badge only once")
-		for _, line := range logs["🎓"+BADGED_ONCE] {
-			Log(line)
-		}
-	}
-
-	if len(logs["🎓"+POSTED]) > 0 {
+	var htmlBody strings.Builder
+	atLeastOneField := false
+	today := time.Now()
+	htmlBody.WriteString("<h2>Watchdog Daily Report – " + today.Format("02/01/2006") + "</h2>")
+	htmlBody.WriteString(`
+		<table style="border:2px solid #ccc; padding: 8px; border-collapse:collapse; background:#f9f9f9;">
+	`)
+	htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+	if len(sortedUser[POSTED]) > 0 {
 		Log("[WATCHDOG] [POST] ├──────── Apprentices: Posts")
-		for _, line := range logs["🎓"+POSTED] {
-			Log(line)
+		for _, user := range sortedUser[POSTED] {
+			Log(formatPostInfo(user, parisLoc, user.Status))
+			addLogToMail(&htmlBody, user, parisLoc)
+		}
+		htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+		atLeastOneField = true
+	}
+
+	if len(sortedUser[POST_ERROR]) > 0 {
+		Log("[WATCHDOG] [POST] ├──────── Apprentices: Posts errors")
+		for _, user := range sortedUser[POST_ERROR] {
+			Log(formatPostInfo(user, parisLoc, user.Error.Error()))
+			addLogToMail(&htmlBody, user, parisLoc)
+		}
+		atLeastOneField = true
+	}
+
+	if len(sortedUser[APPRENTICE_BADGED_ONCE]) > 0 {
+		Log("[WATCHDOG] [POST] ├──────── Apprentices: Used badge only once")
+		for _, user := range sortedUser[APPRENTICE_BADGED_ONCE] {
+			Log(formatPostInfo(user, parisLoc, "Used badge only once"))
+			addLogToMail(&htmlBody, user, parisLoc)
+		}
+		atLeastOneField = true
+	}
+
+	if len(sortedUser[APPRENTICE_NO_BADGE]) > 0 {
+		Log("[WATCHDOG] [POST] ├──────── Apprentices: No badge used today")
+		for _, user := range sortedUser[APPRENTICE_NO_BADGE] {
+			Log(formatPostInfo(user, parisLoc, "No badge used today"))
+			addLogToMail(&htmlBody, user, parisLoc)
+		}
+		atLeastOneField = true
+	}
+	htmlBody.WriteString(`<tr><td style="white-space: pre; font-size: 13px; padding: 1px; padding-left: 20px; padding-right: 20px; line-height: 1;">  </td></tr>`)
+	htmlBody.WriteString(`</table><p style="font-size:11px; color:#888;">Generated by Watchdog at ` + today.Format("15:04:05") + ` - Timezone is CEST &nbsp;</p>`)
+	if atLeastOneField {
+		mailer.Send(mailer.GetRecipients(), fmt.Sprintf("Watchdog – Daily Report - %s", time.Now().Format("02/01/2006")), htmlBody.String(), true)
+	}
+
+	for key, user := range AllUsers {
+		user.Error = nil
+		AllUsers[key] = user
+	}
+}
+
+func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
+	color := "green"
+	firstColor := "green"
+	lastColor := "green"
+	durationColor := "green"
+	emoji := "✅"
+
+	msg := user.Status
+	if user.Error != nil {
+		msg = user.Error.Error()
+	}
+
+	first := user.FirstAccess.In(loc)
+	if first.Before(time.Date(first.Year(), first.Month(), first.Day(), 8, 0, 0, 0, loc)) {
+		firstColor = "orange"
+	}
+
+	last := user.LastAccess.In(loc)
+	if last.After(time.Date(last.Year(), last.Month(), last.Day(), 20, 0, 0, 0, loc)) {
+		lastColor = "orange"
+	}
+
+	firstFormated := first.Format("15:04:05")
+	if first.IsZero() {
+		firstFormated = "00:00:00"
+	}
+
+	lastFormated := last.Format("15:04:05")
+	if last.IsZero() {
+		lastFormated = "00:00:00"
+	}
+
+	if user.Duration < 5*time.Hour {
+		durationColor = "red"
+	} else if user.Duration < 7*time.Hour {
+		durationColor = "orange"
+	}
+
+	if user.Status != POSTED {
+		color = "red"
+		firstColor = "red"
+		lastColor = "red"
+		emoji = "❌"
+		durationColor = "red"
+	}
+
+	htmlBody.WriteString(`<tr><td style="white-space: pre; font-family: Menlo, Consolas, 'Courier New', monospace; font-size: 13px; padding: 1px 20px; line-height: 1;">`)
+	htmlBody.WriteString(`<span style="color: green;">` + emoji + `</span> `)
+	htmlBody.WriteString(`<span style="color:` + color + `;">` + fmt.Sprintf("%-8s", user.Login42) + `</span>: `)
+	htmlBody.WriteString(`<span style="color:` + firstColor + `;">` + firstFormated + `</span>-`)
+	htmlBody.WriteString(`<span style="color:` + lastColor + `;">` + lastFormated + `</span> `)
+	htmlBody.WriteString(`<span style="color:` + durationColor + `;">` + formatDuration(user.Duration) + `</span> — `)
+	htmlBody.WriteString(`<span style="color:` + color + `;">` + msg + `</span>`)
+	htmlBody.WriteString(`</td></tr>`)
+}
+
+func DeleteStudent(login string, withPost bool) {
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		if strings.EqualFold(user.Login42, login) {
+			if withPost {
+				SinglePostApprentice(user)
+			}
+			delete(AllUsers, id)
+			Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted user %s from Watchdog", user.Login42))
+			return
 		}
 	}
-	Log("[WATCHDOG] [POST] └── Done")
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not delete user with login %s: user not found", login))
 }
 
 func UpdateStudent(login string, status bool) {
@@ -434,8 +636,7 @@ func UpdateStudent(login string, status bool) {
 			return
 		}
 	}
-
-	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not find user with login %s to update apprentice status", login))
+	Log(fmt.Sprintf("[WATCHDOG] ⚠️  Could not update user with login %s: user not found", login))
 }
 
 func RefetchStudent(login string) {

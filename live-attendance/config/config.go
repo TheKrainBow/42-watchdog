@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"watchdog/mailer"
 
 	apiManager "github.com/TheKrainBow/go-api"
 	"gopkg.in/yaml.v2"
@@ -40,6 +41,18 @@ type configFile struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 	} `yaml:"42Attendance"`
+	Mailer struct {
+		SmtpServer string   `yaml:"smtp_server"`
+		SmtpPort   int      `yaml:"smtp_port"`
+		SmtpAuth   bool     `yaml:"smtp_auth"`
+		SmtpUser   string   `yaml:"smtp_user"`
+		SmtpPass   string   `yaml:"smtp_pass"`
+		SmtpTls    bool     `yaml:"smtp_tls"`
+		Helo       string   `yaml:"helo"`
+		FromName   string   `yaml:"from_name"`
+		FromMail   string   `yaml:"from_mail"`
+		Recipients []string `yaml:"recipients"`
+	} `yaml:"mailer"`
 }
 
 func LoadConfig(path string) error {
@@ -81,5 +94,18 @@ func LoadConfig(path string) error {
 	if err != nil {
 		return err
 	}
+
+	mailer.InitMailer(mailer.ConfMailer{
+		SmtpServer: ConfigData.Mailer.SmtpServer,
+		SmtpPort:   ConfigData.Mailer.SmtpPort,
+		SmtpAuth:   ConfigData.Mailer.SmtpAuth,
+		SmtpUser:   ConfigData.Mailer.SmtpUser,
+		SmtpPass:   ConfigData.Mailer.SmtpPass,
+		SmtpTls:    ConfigData.Mailer.SmtpTls,
+		Helo:       ConfigData.Mailer.Helo,
+		FromName:   ConfigData.Mailer.FromName,
+		FromMail:   ConfigData.Mailer.FromMail,
+		Recipients: ConfigData.Mailer.Recipients,
+	})
 	return nil
 }

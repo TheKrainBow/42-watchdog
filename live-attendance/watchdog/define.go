@@ -8,6 +8,17 @@ import (
 var AllUsers map[int]User
 var AllUsersMutex sync.Mutex
 
+const (
+	NO_BADGE       string = "User didn't badged yet"
+	BADGED_ONCE    string = "User badge only once"
+	NOT_APPRENTICE string = "User is not an apprentice"
+
+	APPRENTICE_NO_BADGE    string = "Apprentice didn't badged usage yet"
+	APPRENTICE_BADGED_ONCE string = "Apprentice badged only once"
+	POSTED                 string = "Posted"
+	POST_ERROR             string = "Post returned an error"
+)
+
 type User struct {
 	ControlAccessID   int           `json:"control_access_id"`
 	ControlAccessName string        `json:"control_access_name"`
@@ -17,6 +28,8 @@ type User struct {
 	FirstAccess       time.Time     `json:"first_access"`
 	LastAccess        time.Time     `json:"last_access"`
 	Duration          time.Duration `json:"duration"`
+	Error             error
+	Status            string
 }
 
 type ProjectResponse struct {

@@ -12,13 +12,13 @@ import (
 )
 
 type CommandRequest struct {
-	Command    string                 `json:"command"`
-	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Command    string         `json:"command"`
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 var serverURL string
 
-func sendCommand(command string, params map[string]interface{}) {
+func sendCommand(command string, params map[string]any) {
 	cmdReq := CommandRequest{
 		Command:    command,
 		Parameters: params,
@@ -46,7 +46,7 @@ func sendCommand(command string, params map[string]interface{}) {
 	defer resp.Body.Close()
 
 	fmt.Printf("Response: %s\n", bodyBytes)
-	// var respBody map[string]interface{}
+	// var respBody map[string]any
 	// err = json.Unmarshal(bodyBytes, &respBody)
 	// if err != nil {
 	// 	return
@@ -75,7 +75,7 @@ func main() {
 		Short: "Send stop_listen command",
 		Run: func(cmd *cobra.Command, args []string) {
 			postAttendance, _ := cmd.Flags().GetBool("post-attendance")
-			params := map[string]interface{}{}
+			params := map[string]any{}
 			if postAttendance {
 				params["post_attendance"] = true
 			}
@@ -109,7 +109,7 @@ func main() {
 			isApprenticeFlag := cmd.Flags().Changed("is-apprentice")
 			isApprentice, _ := cmd.Flags().GetBool("is-apprentice")
 
-			params := map[string]interface{}{}
+			params := map[string]any{}
 
 			if login != "" {
 				params["login"] = login
@@ -124,6 +124,25 @@ func main() {
 	updateStudentCmd.Flags().String("login", "", "Login of the student")
 	updateStudentCmd.Flags().Bool("is-apprentice", false, "Force apprentice status")
 	rootCmd.AddCommand(updateStudentCmd)
+
+	deleteStudentCmd := &cobra.Command{
+		Use:   "delete-student",
+		Short: "Delete a student from watchdog server",
+		Run: func(cmd *cobra.Command, args []string) {
+			login, _ := cmd.Flags().GetString("login")
+
+			params := map[string]any{}
+
+			if login != "" {
+				params["login"] = login
+			}
+
+			sendCommand("delete_student", params)
+		},
+	}
+	deleteStudentCmd.Flags().String("login", "", "Login of the student")
+	deleteStudentCmd.MarkFlagRequired("login")
+	rootCmd.AddCommand(deleteStudentCmd)
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:    "completion",
