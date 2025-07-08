@@ -17,6 +17,11 @@ import (
 	apiManager "github.com/TheKrainBow/go-api"
 )
 
+var Recipients = []string{
+	"heinz@42nice.fr",
+	// "tac@42nice.fr",
+}
+
 type UserV2 struct {
 	ID    int    `json:"id"`
 	Login string `json:"login"`
