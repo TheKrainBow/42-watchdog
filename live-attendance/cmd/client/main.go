@@ -46,12 +46,6 @@ func sendCommand(command string, params map[string]any) {
 	defer resp.Body.Close()
 
 	fmt.Printf("Response: %s\n", bodyBytes)
-	// var respBody map[string]any
-	// err = json.Unmarshal(bodyBytes, &respBody)
-	// if err != nil {
-	// 	return
-	// }
-	// json.NewDecoder(resp.Body).Decode(&respBody)
 }
 
 func main() {
@@ -143,6 +137,15 @@ func main() {
 	deleteStudentCmd.Flags().String("login", "", "Login of the student")
 	deleteStudentCmd.MarkFlagRequired("login")
 	rootCmd.AddCommand(deleteStudentCmd)
+
+	deletePiscinerCmd := &cobra.Command{
+		Use:   "delete-all-pisciner",
+		Short: "Delete all pisciner from watchdog server",
+		Run: func(cmd *cobra.Command, args []string) {
+			sendCommand("delete_all_pisciner", nil)
+		},
+	}
+	rootCmd.AddCommand(deletePiscinerCmd)
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:    "completion",

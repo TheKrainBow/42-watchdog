@@ -36,6 +36,7 @@ type TimePeriod struct {
 }
 
 var watchtime map[time.Weekday][]TimePeriod
+var currentTimePeriod *TimePeriod
 
 func InitWatchtime(watch map[time.Weekday][][]string) {
 	for key, value := range watch {
@@ -56,17 +57,19 @@ func InitWatchtime(watch map[time.Weekday][][]string) {
 			})
 		}
 	}
+	currentTimePeriod = getTimePeriodForTimeStamp(time.Now())
+	AllowEvents(currentTimePeriod != nil)
 }
 
-func isTimeInWatchtime(timeStamp time.Time) bool {
+func getTimePeriodForTimeStamp(timeStamp time.Time) *TimePeriod {
 	periods := watchtime[timeStamp.Weekday()]
 
 	for _, period := range periods {
 		if timeStamp.After(period.StartingTime) && timeStamp.Before(period.EndingTime) {
-			return true
+			return &period
 		}
 	}
-	return false
+	return nil
 }
 
 func FetchMissingFields(login string, userID string) (string, string) {
@@ -150,6 +153,7 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 		Log(fmt.Sprintf("[WATCHDOG] ERROR: %s", err.Error()))
 		os.Exit(1)
 	}
+
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -164,8 +168,10 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 		Log(fmt.Sprintf("[WATCHDOG] ERROR: %s", err.Error()))
 		os.Exit(1)
 	}
+
 	user.Login42 = res.Properties.Login
 	user.ID42 = res.Properties.ID
+	user.Profile = res.Profile
 	if user.Login42 == "" && user.ID42 == "" {
 		return User{}, -1, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
 	}
@@ -218,13 +224,12 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	}
 	AllUsersMutex.Unlock()
 
-	isInWatchtime := isTimeInWatchtime(timeStamp)
+	isInWatchtime := getTimePeriodForTimeStamp(timeStamp)
 	needPost := false
-	if isInWatchtime != acceptEvents {
-		AllowEvents(isInWatchtime)
-		if !isInWatchtime { // This is the first event we received after the end of time Period
-			needPost = true
-		}
+	if isInWatchtime != currentTimePeriod {
+		needPost = currentTimePeriod != nil
+		AllowEvents(isInWatchtime != nil)
+		currentTimePeriod = isInWatchtime
 	}
 
 	if !acceptEvents {

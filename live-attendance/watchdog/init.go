@@ -3,7 +3,9 @@ package watchdog
 import (
 	"fmt"
 	"os"
+	"time"
 	"watchdog/config"
+	"watchdog/mailer"
 
 	apiManager "github.com/TheKrainBow/go-api"
 )
@@ -71,6 +73,35 @@ func init42v2API() error {
 	return nil
 }
 
+func initMailer() error {
+	mailer.InitMailer(mailer.ConfMailer{
+		SmtpServer: config.ConfigData.Mailer.SmtpServer,
+		SmtpPort:   config.ConfigData.Mailer.SmtpPort,
+		SmtpAuth:   config.ConfigData.Mailer.SmtpAuth,
+		SmtpUser:   config.ConfigData.Mailer.SmtpUser,
+		SmtpPass:   config.ConfigData.Mailer.SmtpPass,
+		SmtpTls:    config.ConfigData.Mailer.SmtpTLS,
+		Helo:       config.ConfigData.Mailer.Helo,
+		FromName:   config.ConfigData.Mailer.FromName,
+		FromMail:   config.ConfigData.Mailer.FromMail,
+		Recipients: config.ConfigData.Mailer.Recipients,
+	})
+	return nil
+}
+
+func initTimePeriod() error {
+	watch := map[time.Weekday][][]string{}
+	watch[time.Monday] = config.ConfigData.Watchtime.Monday
+	watch[time.Tuesday] = config.ConfigData.Watchtime.Tuesday
+	watch[time.Wednesday] = config.ConfigData.Watchtime.Wednesday
+	watch[time.Thursday] = config.ConfigData.Watchtime.Thursday
+	watch[time.Friday] = config.ConfigData.Watchtime.Friday
+	watch[time.Saturday] = config.ConfigData.Watchtime.Saturday
+	watch[time.Sunday] = config.ConfigData.Watchtime.Sunday
+	InitWatchtime(watch)
+	return nil
+}
+
 func InitAPIs() error {
 	Log("[WATCHDOG] ┌─ 🚀 Initializing APIs")
 	Log("[WATCHDOG] ├── 🪪  Initializing Access Control API")
@@ -85,8 +116,21 @@ func InitAPIs() error {
 		Log(fmt.Sprintf("ERROR: %s\n", err.Error()))
 		os.Exit(1)
 	}
-	Log("[WATCHDOG] └── ⏱️  Initializing 42 Chronos API")
+	Log("[WATCHDOG] ├── ⏱️  Initializing 42 Chronos API")
 	err = init42AttendanceAPI()
+	if err != nil {
+		Log(fmt.Sprintf("ERROR: %s\n", err.Error()))
+		os.Exit(1)
+	}
+	Log("[WATCHDOG] ├─ 🛠️  Initializing Other Services")
+	Log("[WATCHDOG] ├── ✉️  Initializing Mailer")
+	err = initMailer()
+	if err != nil {
+		Log(fmt.Sprintf("ERROR: %s\n", err.Error()))
+		os.Exit(1)
+	}
+	Log("[WATCHDOG] └── 📅 Initializing WorkTime")
+	err = initTimePeriod()
 	if err != nil {
 		Log(fmt.Sprintf("ERROR: %s\n", err.Error()))
 		os.Exit(1)

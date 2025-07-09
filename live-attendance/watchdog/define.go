@@ -29,6 +29,7 @@ type User struct {
 	FirstAccess       time.Time     `json:"first_access"`
 	LastAccess        time.Time     `json:"last_access"`
 	Duration          time.Duration `json:"duration"`
+	Profile           int
 	Error             error
 	Status            string
 }
@@ -48,8 +49,16 @@ type Property42 struct {
 	ID    string `json:"ft_id"`
 }
 
+type ProfileType int
+
+const (
+	Piscineux ProfileType = 2
+	Student   ProfileType = 4
+)
+
 type UserResponse struct {
 	Properties Property42 `json:"properties"`
+	Profile    int        `json:"access_profile"`
 }
 
 type EventResponse struct {

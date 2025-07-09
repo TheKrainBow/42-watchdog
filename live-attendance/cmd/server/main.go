@@ -19,8 +19,6 @@ func startHTTPServer(port string) {
 	watchdog.Log("       ├── /commands")
 	watchdog.Log("       └── /webhook/access-control")
 
-	watchdog.AllowEvents(true)
-
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		watchdog.Log(fmt.Sprintf("[HTTP] [FATAL] could not start server: %s\n", err))
 		os.Exit(1)

@@ -2,9 +2,7 @@ package config
 
 import (
 	"os"
-	"watchdog/mailer"
 
-	apiManager "github.com/TheKrainBow/go-api"
 	"gopkg.in/yaml.v2"
 )
 
@@ -12,56 +10,66 @@ const AccessControl string = "access-control"
 const FTv2 string = "42-v2"
 const FTAttendance string = "42-attendance"
 
-var ConfigData configFile
+var ConfigData ConfigFile
 
-type configFile struct {
-	AccessControl struct {
-		Endpoint string `yaml:"endpoint"`
-		TestPath string `yaml:"testpath"`
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-	} `yaml:"AccessControl"`
-	ApiV2 struct {
-		TokenUrl           string   `yaml:"tokenUrl"`
-		Endpoint           string   `yaml:"endpoint"`
-		TestPath           string   `yaml:"testpath"`
-		Uid                string   `yaml:"uid"`
-		Secret             string   `yaml:"secret"`
-		Scope              string   `yaml:"scope"`
-		CampusID           string   `yaml:"campusId"`
-		ApprenticeProjects []string `yaml:"apprenticeProjects"`
-	} `yaml:"42apiV2"`
-	Attendance42 struct {
-		AutoPost bool   `yaml:"autoPost"`
-		TokenUrl string `yaml:"tokenUrl"`
-		Endpoint string `yaml:"endpoint"`
-		TestPath string `yaml:"testpath"`
-		Uid      string `yaml:"uid"`
-		Secret   string `yaml:"secret"`
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-	} `yaml:"42Attendance"`
-	Mailer struct {
-		SmtpServer string   `yaml:"smtp_server"`
-		SmtpPort   int      `yaml:"smtp_port"`
-		SmtpAuth   bool     `yaml:"smtp_auth"`
-		SmtpUser   string   `yaml:"smtp_user"`
-		SmtpPass   string   `yaml:"smtp_pass"`
-		SmtpTLS    bool     `yaml:"smtp_tls"`
-		Helo       string   `yaml:"helo"`
-		FromName   string   `yaml:"from_name"`
-		FromMail   string   `yaml:"from_mail"`
-		Recipients []string `yaml:"recipients"`
-	} `yaml:"mailer"`
-	Watchtime struct {
-		Monday    []string `yaml:"monday"`
-		Tuesday   []string `yaml:"thuesday"`
-		Wednesday []string `yaml:"wednesday"`
-		Thursday  []string `yaml:"thursday"`
-		Friday    []string `yaml:"friday"`
-		Saturday  []string `yaml:"saturday"`
-		Sunday    []string `yaml:"sunday"`
-	} `yaml:"watchtime"`
+type ConfigWatchtime struct {
+	Monday    [][]string `yaml:"monday"`
+	Tuesday   [][]string `yaml:"thuesday"`
+	Wednesday [][]string `yaml:"wednesday"`
+	Thursday  [][]string `yaml:"thursday"`
+	Friday    [][]string `yaml:"friday"`
+	Saturday  [][]string `yaml:"saturday"`
+	Sunday    [][]string `yaml:"sunday"`
+}
+
+type ConfigAccessControl struct {
+	Endpoint string `yaml:"endpoint"`
+	TestPath string `yaml:"testpath"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+type ConfigAPIV2 struct {
+	TokenUrl           string   `yaml:"tokenUrl"`
+	Endpoint           string   `yaml:"endpoint"`
+	TestPath           string   `yaml:"testpath"`
+	Uid                string   `yaml:"uid"`
+	Secret             string   `yaml:"secret"`
+	Scope              string   `yaml:"scope"`
+	CampusID           string   `yaml:"campusId"`
+	ApprenticeProjects []string `yaml:"apprenticeProjects"`
+}
+
+type ConfigAttendance42 struct {
+	AutoPost bool   `yaml:"autoPost"`
+	TokenUrl string `yaml:"tokenUrl"`
+	Endpoint string `yaml:"endpoint"`
+	TestPath string `yaml:"testpath"`
+	Uid      string `yaml:"uid"`
+	Secret   string `yaml:"secret"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+type ConfigMailer struct {
+	SmtpServer string   `yaml:"smtp_server"`
+	SmtpPort   int      `yaml:"smtp_port"`
+	SmtpAuth   bool     `yaml:"smtp_auth"`
+	SmtpUser   string   `yaml:"smtp_user"`
+	SmtpPass   string   `yaml:"smtp_pass"`
+	SmtpTLS    bool     `yaml:"smtp_tls"`
+	Helo       string   `yaml:"helo"`
+	FromName   string   `yaml:"from_name"`
+	FromMail   string   `yaml:"from_mail"`
+	Recipients []string `yaml:"recipients"`
+}
+
+type ConfigFile struct {
+	AccessControl ConfigAccessControl `yaml:"AccessControl"`
+	ApiV2         ConfigAPIV2         `yaml:"42apiV2"`
+	Attendance42  ConfigAttendance42  `yaml:"42Attendance"`
+	Mailer        ConfigMailer        `yaml:"mailer"`
+	Watchtime     ConfigWatchtime     `yaml:"watchtime"`
 }
 
 func LoadConfig(path string) error {
@@ -76,45 +84,5 @@ func LoadConfig(path string) error {
 	if err != nil {
 		return err
 	}
-
-	_, err = apiManager.NewAPIClient(FTv2, apiManager.APIClientInput{
-		AuthType:     apiManager.AuthTypeClientCredentials,
-		TokenURL:     ConfigData.ApiV2.TokenUrl,
-		Endpoint:     ConfigData.ApiV2.Endpoint,
-		TestPath:     ConfigData.ApiV2.TestPath,
-		ClientID:     ConfigData.ApiV2.Uid,
-		ClientSecret: ConfigData.ApiV2.Secret,
-		Scope:        ConfigData.ApiV2.Scope,
-	})
-	if err != nil {
-		return err
-	}
-
-	_, err = apiManager.NewAPIClient(FTAttendance, apiManager.APIClientInput{
-		AuthType:     apiManager.AuthTypePassword,
-		TokenURL:     ConfigData.Attendance42.TokenUrl,
-		Endpoint:     ConfigData.Attendance42.Endpoint,
-		TestPath:     ConfigData.Attendance42.TestPath,
-		ClientID:     ConfigData.Attendance42.Uid,
-		ClientSecret: ConfigData.Attendance42.Secret,
-		Username:     ConfigData.Attendance42.Username,
-		Password:     ConfigData.Attendance42.Password,
-	})
-	if err != nil {
-		return err
-	}
-
-	mailer.InitMailer(mailer.ConfMailer{
-		SmtpServer: ConfigData.Mailer.SmtpServer,
-		SmtpPort:   ConfigData.Mailer.SmtpPort,
-		SmtpAuth:   ConfigData.Mailer.SmtpAuth,
-		SmtpUser:   ConfigData.Mailer.SmtpUser,
-		SmtpPass:   ConfigData.Mailer.SmtpPass,
-		SmtpTls:    ConfigData.Mailer.SmtpTLS,
-		Helo:       ConfigData.Mailer.Helo,
-		FromName:   ConfigData.Mailer.FromName,
-		FromMail:   ConfigData.Mailer.FromMail,
-		Recipients: ConfigData.Mailer.Recipients,
-	})
 	return nil
 }
