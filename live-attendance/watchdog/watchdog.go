@@ -38,7 +38,49 @@ type TimePeriod struct {
 var watchtime map[time.Weekday][]TimePeriod
 var currentTimePeriod *TimePeriod
 
+func checkWatchtime() {
+	Log("[WATCHDOG] ┌─ Watch periods")
+	// Iterate over each day of the week
+	for day := range 7 {
+		periods := watchtime[time.Weekday(day)]
+		Log(fmt.Sprintf("[WATCHDOG] ├── %s\n", time.Weekday(day)))
+
+		var validPeriods []TimePeriod
+		for i, period := range periods {
+			log := strings.Builder{}
+			log.WriteString(fmt.Sprintf("[WATCHDOG] ├─ %s -> %s", period.StartingTime.Format("15:04:05"), period.EndingTime.Format("15:04:05")))
+
+			if period.StartingTime.After(period.EndingTime) {
+				log.WriteString(" (Discarded, invalid time)")
+				Log(log.String())
+				continue
+			}
+
+			if i > 0 && periods[i-1].EndingTime.After(period.StartingTime) {
+				log.WriteString(" (Discarded, overlapping periods)")
+				Log(log.String())
+				continue
+			}
+
+			if i > 0 && periods[i-1].EndingTime.After(period.StartingTime) {
+				log.WriteString(" (Discarded, Period must be in chronological order)")
+				Log(log.String())
+				continue
+			}
+			validPeriods = append(validPeriods, period)
+			Log(log.String())
+		}
+
+		if len(periods) == 0 {
+			Log("[WATCHDOG] ├─ None")
+		}
+		watchtime[time.Weekday(day)] = validPeriods
+	}
+	Log("[WATCHDOG] └─ Done")
+}
+
 func InitWatchtime(watch map[time.Weekday][][]string) {
+	watchtime = make(map[time.Weekday][]TimePeriod)
 	for key, value := range watch {
 		for _, ranges := range value {
 			first, err := time.Parse("15:04:05", ranges[0])
@@ -57,16 +99,32 @@ func InitWatchtime(watch map[time.Weekday][][]string) {
 			})
 		}
 	}
-	currentTimePeriod = getTimePeriodForTimeStamp(time.Now())
-	AllowEvents(currentTimePeriod != nil)
+	checkWatchtime()
+}
+
+func AfterTime(time1, time2 time.Time) bool {
+	// Extract only the time parts (hour, minute, second)
+	t1 := time.Date(0, 1, 1, time1.Hour(), time1.Minute(), time1.Second(), 0, time.Local)
+	t2 := time.Date(0, 1, 1, time2.Hour(), time2.Minute(), time2.Second(), 0, time.Local)
+
+	return t1.After(t2)
+}
+
+// BeforeTime checks if time1 is before time2 (ignoring dates)
+func BeforeTime(time1, time2 time.Time) bool {
+	// Extract only the time parts (hour, minute, second)
+	t1 := time.Date(0, 1, 1, time1.Hour(), time1.Minute(), time1.Second(), 0, time.Local)
+	t2 := time.Date(0, 1, 1, time2.Hour(), time2.Minute(), time2.Second(), 0, time.Local)
+
+	return t1.Before(t2)
 }
 
 func getTimePeriodForTimeStamp(timeStamp time.Time) *TimePeriod {
 	periods := watchtime[timeStamp.Weekday()]
 
-	for _, period := range periods {
-		if timeStamp.After(period.StartingTime) && timeStamp.Before(period.EndingTime) {
-			return &period
+	for i, period := range periods {
+		if AfterTime(timeStamp, period.StartingTime) && BeforeTime(timeStamp, period.EndingTime) {
+			return &periods[i]
 		}
 	}
 	return nil
@@ -171,7 +229,7 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 
 	user.Login42 = res.Properties.Login
 	user.ID42 = res.Properties.ID
-	user.Profile = res.Profile
+	user.Profile = ProfileType(res.Profile)
 	if user.Login42 == "" && user.ID42 == "" {
 		return User{}, -1, fmt.Errorf("user (%s) has no Login42 AND no ID42", accessControlUsername)
 	}
@@ -196,10 +254,18 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 			break
 		}
 	}
-	if user.IsApprentice {
+	if user.IsApprentice && user.Profile != Student {
+		Log(fmt.Sprintf("[WATCHDOG] ⚠️ Created a new user: %s is an apprentice with temporary badge", user.Login42))
+	} else if user.IsApprentice {
 		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is an apprentice", user.Login42))
-	} else {
+	} else if user.Profile == Pisciner {
+		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is a pisciner", user.Login42))
+	} else if user.Profile == Student {
 		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is a basic student", user.Login42))
+	} else if user.Profile == Staff {
+		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is a Staff", user.Login42))
+	} else {
+		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is an extern", user.Login42))
 	}
 	return user, -1, nil
 }
@@ -225,10 +291,16 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	AllUsersMutex.Unlock()
 
 	isInWatchtime := getTimePeriodForTimeStamp(timeStamp)
-	needPost := false
 	if isInWatchtime != currentTimePeriod {
-		needPost = currentTimePeriod != nil
+		if isInWatchtime != nil {
+			Log(fmt.Sprintf("[WATCHDOG] 🕓 Watchtime changed: [%s - %s]", (*isInWatchtime).StartingTime.Format("15:04:05"), (*isInWatchtime).EndingTime.Format("15:04:05")))
+		} else {
+			Log("[WATCHDOG] 🕓 Watchtime changed: Watchdog went to sleep")
+		}
 		AllowEvents(isInWatchtime != nil)
+		if currentTimePeriod != nil {
+			PostApprenticesAttendances()
+		}
 		currentTimePeriod = isInWatchtime
 	}
 
@@ -249,10 +321,6 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 	AllUsersMutex.Lock()
 	AllUsers[userID] = user
 	AllUsersMutex.Unlock()
-
-	if needPost {
-		PostApprenticesAttendances()
-	}
 }
 
 func PrintUsersTimers() {
@@ -677,6 +745,18 @@ func addLogToMail(htmlBody *strings.Builder, user User, loc *time.Location) {
 	htmlBody.WriteString(`</td></tr>`)
 }
 
+func DeleteAllPisciners() {
+	AllUsersMutex.Lock()
+	defer AllUsersMutex.Unlock()
+
+	for id, user := range AllUsers {
+		if user.Profile == Pisciner {
+			delete(AllUsers, id)
+			Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted pisciner %s from Watchdog", user.Login42))
+		}
+	}
+}
+
 func DeleteStudent(login string, withPost bool) {
 	AllUsersMutex.Lock()
 	defer AllUsersMutex.Unlock()
@@ -687,7 +767,11 @@ func DeleteStudent(login string, withPost bool) {
 				SinglePostApprentice(user)
 			}
 			delete(AllUsers, id)
-			Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted user %s from Watchdog", user.Login42))
+			if withPost {
+				Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted user %s from Watchdog with Post", user.Login42))
+			} else {
+				Log(fmt.Sprintf("[WATCHDOG] 🗑️  Deleted user %s from Watchdog", user.Login42))
+			}
 			return
 		}
 	}

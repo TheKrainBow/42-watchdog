@@ -29,7 +29,7 @@ type User struct {
 	FirstAccess       time.Time     `json:"first_access"`
 	LastAccess        time.Time     `json:"last_access"`
 	Duration          time.Duration `json:"duration"`
-	Profile           int
+	Profile           ProfileType
 	Error             error
 	Status            string
 }
@@ -52,8 +52,9 @@ type Property42 struct {
 type ProfileType int
 
 const (
-	Piscineux ProfileType = 2
-	Student   ProfileType = 4
+	Staff    ProfileType = 1
+	Pisciner ProfileType = 2
+	Student  ProfileType = 4
 )
 
 type UserResponse struct {

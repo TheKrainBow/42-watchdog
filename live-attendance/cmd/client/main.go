@@ -124,8 +124,11 @@ func main() {
 		Short: "Delete a student from watchdog server",
 		Run: func(cmd *cobra.Command, args []string) {
 			login, _ := cmd.Flags().GetString("login")
+			withPost, _ := cmd.Flags().GetBool("withPost")
 
-			params := map[string]any{}
+			params := map[string]any{
+				"withPost": withPost,
+			}
 
 			if login != "" {
 				params["login"] = login
@@ -134,7 +137,9 @@ func main() {
 			sendCommand("delete_student", params)
 		},
 	}
+
 	deleteStudentCmd.Flags().String("login", "", "Login of the student")
+	deleteStudentCmd.Flags().Bool("withPost", true, "Whether to post attendance before deleting")
 	deleteStudentCmd.MarkFlagRequired("login")
 	rootCmd.AddCommand(deleteStudentCmd)
 

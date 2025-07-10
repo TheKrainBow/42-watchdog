@@ -109,18 +109,21 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	case "delete_student":
 		params := cmdReq.Parameters
 		login, hasLogin := "", false
+		withPost := true // Default value
 
 		if params != nil {
 			if l, ok := params["login"].(string); ok {
 				login = l
 				hasLogin = true
 			}
+			if wp, ok := params["withPost"].(bool); ok {
+				withPost = wp
+			}
 		}
 
 		switch {
 		case hasLogin:
-			watchdog.Log(fmt.Sprintf("[CLI] 🗑️ Deleting student %s", login))
-			watchdog.DeleteStudent(login, true)
+			watchdog.DeleteStudent(login, withPost)
 			responseMessage = fmt.Sprintf("Deleted student %s", login)
 
 		default:
@@ -128,6 +131,8 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 			statusCode = http.StatusBadRequest
 		}
 
+	case "delete_all_pisciner":
+		watchdog.DeleteAllPisciners()
 	case "get_status":
 		watchdog.PrintUsersTimers()
 		responseMessage = "Check server logs for status detail"

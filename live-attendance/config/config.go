@@ -14,7 +14,7 @@ var ConfigData ConfigFile
 
 type ConfigWatchtime struct {
 	Monday    [][]string `yaml:"monday"`
-	Tuesday   [][]string `yaml:"thuesday"`
+	Tuesday   [][]string `yaml:"tuesday"`
 	Wednesday [][]string `yaml:"wednesday"`
 	Thursday  [][]string `yaml:"thursday"`
 	Friday    [][]string `yaml:"friday"`
