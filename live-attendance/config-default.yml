@@ -27,15 +27,15 @@ AccessControl:
     password: "YOUR_42STAFF_PASSWORD"
 
 mailer:
-    smtp_server: ""
-    smtp_port: 4242
+    smtp_server: "smtp-relay.gmail.com"
+    smtp_port: 587
     smtp_auth: false
     smtp_user: ""
     smtp_pass: ""
     smtp_tls: true
-    helo: ""
-    from_name: ""
-    from_mail: ""
+    helo: "pedago.42nice.fr"
+    from_name: "Watchdog"
+    from_mail: "pedago.watchdog.noreply@42nice.fr"
     recipients: ["heinz@42nice.fr"]
 
 watchtime:

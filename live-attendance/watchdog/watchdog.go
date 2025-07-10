@@ -255,7 +255,7 @@ func CreateNewUser(userID int, accessControlUsername string) (User, int, error) 
 		}
 	}
 	if user.IsApprentice && user.Profile != Student {
-		Log(fmt.Sprintf("[WATCHDOG] ⚠️ Created a new user: %s is an apprentice with temporary badge", user.Login42))
+		Log(fmt.Sprintf("[WATCHDOG] ⚠️  Created a new user: %s is an apprentice with temporary badge", user.Login42))
 	} else if user.IsApprentice {
 		Log(fmt.Sprintf("[WATCHDOG] 📋 Created a new user: %s is an apprentice", user.Login42))
 	} else if user.Profile == Pisciner {
@@ -283,9 +283,23 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 			return
 		}
 		if badge != -1 {
-			Log(fmt.Sprintf("[WATCHDOG] ⚠️  User %s is already registered with %d. %d is a tmp badge?\n", user.Login42, badge, userID))
-			user = AllUsers[badge]
-			userID = badge
+			Log(fmt.Sprintf("[WATCHDOG] ⚠️  User %s is already registered with another badge\n", user.Login42))
+			if user.Profile == Student { // Badge that scanned is a student account. We need to replace the temporary badge with this one
+				Log("[WATCHDOG] ⚠️  Stored badge is a temporary badge. Replacing with student badge\n")
+				// Retrieve the user associated with the badge
+				existingUser := AllUsers[badge]
+				existingUser.Profile = Student
+				existingUser.ControlAccessID = userID
+				existingUser.ControlAccessName = accessControlUsername
+
+				// Replace the temporary badge with the official badge
+				AllUsers[userID] = existingUser // Assign the updated user to the new badge
+				delete(AllUsers, badge)         // Remove the temporary badge entry
+			} else {
+				Log("[WATCHDOG] ⚠️  Used badge is a temporary badge. Logging User access on the real badge\n")
+				user = AllUsers[badge]
+				userID = badge
+			}
 		}
 	}
 	AllUsersMutex.Unlock()
@@ -297,15 +311,19 @@ func UpdateUserAccess(userID int, accessControlUsername string, timeStamp time.T
 		} else {
 			Log("[WATCHDOG] 🕓 Watchtime changed: Watchdog went to sleep")
 		}
-		AllowEvents(isInWatchtime != nil)
 		if currentTimePeriod != nil {
 			PostApprenticesAttendances()
 		}
 		currentTimePeriod = isInWatchtime
 	}
 
-	if !acceptEvents {
+	if isInWatchtime == nil {
 		Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s, but watchdog is sleeping", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
+		return
+	}
+
+	if !acceptEvents {
+		Log(fmt.Sprintf("[WATCHDOG] 🚪 User %s used door %s at %s, but events are not accepted", user.Login42, doorName, timeStamp.Format("15:04:05 MST")))
 		return
 	}
 

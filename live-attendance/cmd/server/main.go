@@ -57,6 +57,7 @@ func main() {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
 	}
+	watchdog.AllowEvents(true)
 	go startHTTPServer("8042")
 
 	// Wait a SIGINT or SIGTERM signal to stop
